@@ -22,7 +22,7 @@ WriteBuildData.prototype.getNextBuildNumber = function(cb) {
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });
   this.dataset.runInTransaction(function(transaction, done) {
-    var query = me.dataset.createQuery(me.namespace, [ kind ]);
+    var query = me.dataset.createQuery(me.namespace, key.path);
     transaction.runQuery(query, function(err, entities, endCursor, apiResponse) {
       if (err) {
         cb(err);
