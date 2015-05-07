@@ -42,4 +42,4 @@ WriteBuildData.prototype.getNextBuildNumber = function(cb) {
   }, function(err) { cb(err, id); });
 };
 
-module.exports = Builds;
+module.exports = WriteBuildData;
