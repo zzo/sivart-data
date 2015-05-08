@@ -5,7 +5,7 @@ var gcloud = require('gcloud');
 function WriteBuildData(repoName, githubEvent) {
   this.name = repoName;
   this.bucketName = Util.makeBucketName(repoName);
-  this.github = githubEvent;
+  this.kind = githubEvent;
   this.namespace = Util.makeBucketName(repoName);
   this.dataset = gcloud.datastore.dataset(Auth);
 }
@@ -14,11 +14,22 @@ WriteBuildData.prototype.getBucketName = function() {
   return this.bucketName;
 };
 
-WriteBuildData.prototype.addBuild = function(buildNumber, buildError, metadata, cb) {
+// Write out what happened 
+WriteBuildData.prototype.store = function(buildInfo, buildMetadata, cb) {
+  if (!this.buildId) {
+    var me = this;
+    this.getNextBuildNumber(function(err, number) {
+      me.store(buildInfo, buildMetadata, cb);
+    });
+  } else {
+    var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, this.buildId ]});
+    var entity = { key: key, data: { builds: buildInfo, metadata: buildMetadata }};
+    entity = Util.cleanDatastoreContents(entity);
+    this.dataset.save(entity, cb);
+  }
 };
 
 WriteBuildData.prototype.getNextBuildNumber = function(cb) {
-  var id;
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });
   this.dataset.runInTransaction(function(transaction, done) {
@@ -35,11 +46,11 @@ WriteBuildData.prototype.getNextBuildNumber = function(cb) {
           entity = { key: key, data: { value: 1 }};
         }
         transaction.save(entity);
-        id = entity.data.value;
+        me.buildId = entity.data.value;
         done();
       }
     });
-  }, function(err) { cb(err, id); });
+  }, function(err) { cb(err, me.buildId); });
 };
 
 module.exports = WriteBuildData;

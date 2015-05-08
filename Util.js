@@ -8,5 +8,22 @@ module.exports = {
       bucket = bucket.slice(0, - 1); 
     }
     return bucket.slice(0, 63);
+  },
+
+  // Cloud datastore does not like nulls or empty Objects - replace them with ''
+  cleanDatastoreContents: function(data) {
+    data = JSON.parse(JSON.stringify(data, function(k, v) {
+      if (!v) {
+        // Datasets don't like nulls in them - replace with empty strings
+        return '';
+      } else if (v instanceof Object && !Object.keys(v).length) {
+        // Datasets also don't like empty objects!
+        return ''; // or maybe { ____iamempty: 0 }?
+      } else {
+        return v;
+      }
+    }));
+
+    return data;
   }
 };

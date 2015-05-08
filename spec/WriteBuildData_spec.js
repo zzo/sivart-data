@@ -1,6 +1,9 @@
 var WriteBuildData = require('../WriteBuildData');
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 100000;
+
 describe("WriteBuildData", function() {
   var wbd;
+
   beforeEach(function() {
     wbd = new WriteBuildData('a/repo/name', 'push');
   });
@@ -25,4 +28,10 @@ describe("WriteBuildData", function() {
     });
   });
 
+  it("can store", function(done) {
+    wbd.store([ { a: 3} , {b:5}], { meta: 'data'}, function(err) {
+      expect(err).toBeNull();
+      done();
+    });
+  });
 });
