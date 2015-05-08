@@ -23,8 +23,8 @@ WriteBuildData.prototype.store = function(buildInfo, buildMetadata, cb) {
     });
   } else {
     var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, this.buildId ]});
-    var entity = { key: key, data: { builds: buildInfo, metadata: buildMetadata }};
-    entity = Util.cleanDatastoreContents(entity);
+    var dataToStore = Util.cleanDatastoreContents({ builds: buildInfo, metadata: buildMetadata });
+    var entity = { key: key, data: dataToStore };
     this.dataset.save(entity, cb);
   }
 };
