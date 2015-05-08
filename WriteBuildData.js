@@ -15,15 +15,15 @@ WriteBuildData.prototype.getBucketName = function() {
 };
 
 // Write out what happened 
-WriteBuildData.prototype.store = function(buildInfo, buildMetadata, cb) {
+WriteBuildData.prototype.store = function(buildInfo, rawBuildRequest, cb) {
   if (!this.buildId) {
     var me = this;
     this.getNextBuildNumber(function(err, number) {
-      me.store(buildInfo, buildMetadata, cb);
+      me.store(buildInfo, rawBuildRequest, cb);
     });
   } else {
     var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, this.buildId ]});
-    var dataToStore = Util.cleanDatastoreContents({ builds: buildInfo, metadata: buildMetadata });
+    var dataToStore = Util.cleanDatastoreContents({ builds: buildInfo, metadata: rawBuildRequest });
     var entity = { key: key, data: dataToStore };
     this.dataset.save(entity, cb);
   }
