@@ -20,10 +20,11 @@ ReadBuildData.prototype.runQuery_ = function(query, cb) {
     } else {
       var data = [];
       entities.forEach(function(entity) {
+        entity.data.__buildid = entity.key.path[1];
         data.push(entity.data);
       });
       if (data.length) {
-        cb(null, data, { endCursor: endCursor, query: query});
+        cb(null, data, { endCursor: endCursor, query: query });
       } else {
         cb(null, data);
       }
@@ -94,12 +95,48 @@ ReadBuildData.prototype.getBranches = function(cb) {
 
   // Get all the cache files for this repo+branch combination
   //  see 'saveLogs.js' in sivart-slave for where this stuff is saved
-  this.bucket.getFiles({ prefix: 'branch-' }, function(err, files, next) {
+  this.bucket.getFiles({ delimiter: '/'  }, function(err, files, next, apiResponse) {
+    var prefixes = apiResponse.prefixes.map(function(prefix) { 
+      prefix = prefix.replace(/^branch-/, '');
+      prefix = prefix.replace(/\/$/, '');
+      return prefix;
+    });
+    cb(err, prefixes);
+    /*
+    console.log(apiResponse);
     me.getAllFiles(err, files, next, function(err, files) {
       // get rid of all 'cache-' files - the rest are branches
       cb(null, files);
     });
+    */
   });
 };
 
+ReadBuildData.prototype.getBuilds = function(branch, cb) {
+  this.bucket = this.storage.bucket(this.getBucketName());
+  var me = this;
+
+  var branchPrefix = ['branch', branch].join('-');
+  this.bucket.getFiles({ delimiter: '/', prefix: branchPrefix + '/' }, function(err, files, next, api) {
+    var builds = api.prefixes;
+    builds = builds.map(function(build) {
+      return build.replace(new RegExp(branchPrefix+'|\/', 'g'), '');
+    });
+    cb(null, builds);
+  });
+};
+ 
+ReadBuildData.prototype.getBuildRuns = function(branch, buildNumber, cb) {
+  this.bucket = this.storage.bucket(this.getBucketName());
+  var me = this;
+
+  var branchPrefix = [['branch', branch].join('-'), buildNumber].join('/');
+  this.bucket.getFiles({ prefix: branchPrefix }, function(err, files, next, api) {
+    me.getAllFiles(err, files, next, function(err, files) {
+      files.shift();
+      cb(null, files);
+    });
+  });
+};
+ 
 module.exports = ReadBuildData;

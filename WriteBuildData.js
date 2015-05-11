@@ -37,6 +37,29 @@ WriteBuildData.prototype.store = function(buildInfo, rawBuildRequest, cb) {
   }
 };
 
+// Update build state
+WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, cb) {
+  var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, buildId ]});
+  this.dataset.runInTransaction(function(transaction, done) {
+    transaction.get(key, function(err, entity) {
+      if (err) {
+        cb(err);
+      } else {
+        entity.data.runs.forEach(function(run) {
+          if (run.buildNumber === buildNumber) {
+            run.state = newState;
+          }
+        });
+        transaction.update(entity);
+        done();
+      }
+    });
+  }, function(err) {
+    cb(err);
+  });
+};
+
+
 WriteBuildData.prototype.getNextBuildNumber = function(cb) {
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });

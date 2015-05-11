@@ -28,7 +28,8 @@ describe("ReadBuildData", function() {
     });
   });
 
-  it("can get all files in a bucket", function(done) {
+  it("can get branch names", function(done) {
+    rbd = new ReadBuildData('test/repo');
     rbd.getBranches(function(err, branches) {
       console.log('branches');
       console.log(branches);
@@ -36,5 +37,21 @@ describe("ReadBuildData", function() {
     });
   });
 
+  it("can get build numbers", function(done) {
+    rbd = new ReadBuildData('test/repo');
+    rbd.getBuilds('foobie', function(err, builds) {
+      console.log('build #s');
+      console.log(builds);
+      done();
+    });
+  });
 
+  it("can get build results", function(done) {
+    rbd = new ReadBuildData('test/repo');
+    rbd.getBuildResults('foobie', 1, function(err, resultFiles) {
+      console.log('build files');
+      console.log(resultFiles);
+      done();
+    });
+  });
 });

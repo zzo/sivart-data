@@ -1,4 +1,5 @@
 var WriteBuildData = require('../WriteBuildData');
+var ReadBuildData = require('../ReadBuildData');
 var path = require('path');
 var fs = require('fs');
 
@@ -6,6 +7,7 @@ jasmine.DEFAULT_TIMEOUT_INTERVAL = 100000;
 
 describe("WriteBuildData datastore tests", function() {
   var wbd;
+  var buildId;
 
   beforeEach(function() {
     wbd = new WriteBuildData('a/repo/name', 'push');
@@ -32,13 +34,25 @@ describe("WriteBuildData datastore tests", function() {
   });
 
   it("can store", function(done) {
-    wbd.store([{ a: 3 } , { b:5 }], { meta: 'data'}, function(err) {
+    wbd.store([{ a: 3, state: 'fun' } , { b:5, state: 'somewhere' }], { meta: 'data'}, function(err) {
       expect(err).toBeNull();
+      buildId = wbd.buildId;
       done();
     });
   });
-});
 
+  it("can update", function(done) {
+    var rbd = new ReadBuildData('zzo/angular', 'push');
+    rbd.getSomePushBuilds(function(err, builds) {
+      var buildId = builds[0].__buildid;
+      wbd = new WriteBuildData('zzo/angular', 'push');
+      wbd.updateState(buildId, 1, 'NEWSTAT2', function(err) {
+        expect(err).toBeNull();
+        done();
+      });
+    });
+  });
+});
 
 describe("WriteBuildData bucket tests", function() {
   var wbd;
