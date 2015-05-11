@@ -44,29 +44,10 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
   this.dataset.runInTransaction(function(transaction, done) {
     transaction.get(key, function(err, entity) {
       if (err) {
-        if (!me.tries) {
-          me.tries = 0;
-        }
-        if (err.code === 409 && me.tries < 10) {
-          // message: 'too much contention on these datastore entities. please try again.',
-          // sleep for a second & try again
-          me.tries++;
-          var sleep = Math.floor(Math.random() * 5) + 1;
-          console.log('409 - going around again after %s seconds', sleep);
-          setTimeout(function() {
-            me.updateState(buildId, buildNumber, newState, cb);
-          }, 1000 * sleep);
-        } else {
-          me.tries = 0;
-          if (me.tries > 0) {
-            console.log('Too many tries - failing');
-          }
-          cb(err);
-        }
+        cb(err);
       } else {
-        me.tries = 0;
         entity.data.runs.forEach(function(run) {
-          if (run.buildNumber === parseInt(buildNumber)) {
+          if (run.buildNumber === parseInt(buildNumber, 10)) {
             run.state = newState;
             run.updated = new Date().getTime();
           }
@@ -76,10 +57,31 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
       }
     });
   }, function(err) {
-    cb(err);
+    if (err) {
+      if (!me.tries) {
+        me.tries = 0;
+      }
+      if (err.code === 409 && me.tries < 10) {
+        // message: 'too much contention on these datastore entities. please try again.',
+        // sleep for a second & try again
+        me.tries++;
+        var sleep = Math.floor(Math.random() * 5) + 1;
+        console.log('409 - going around again after %s seconds', sleep);
+        setTimeout(function() {
+          me.updateState(buildId, buildNumber, newState, cb);
+        }, 1000 * sleep);
+      } else {
+        if (me.tries > 0) {
+          console.log('Too many tries - failing');
+          me.tries = 0;
+        }
+        cb(err);
+      }
+    } else {
+      cb();
+    }
   });
 };
-
 
 WriteBuildData.prototype.getNextBuildNumber = function(cb) {
   var me = this;
