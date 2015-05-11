@@ -40,11 +40,31 @@ WriteBuildData.prototype.store = function(buildInfo, rawBuildRequest, cb) {
 // Update build state
 WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, cb) {
   var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, buildId ]});
+  var me = this;
   this.dataset.runInTransaction(function(transaction, done) {
     transaction.get(key, function(err, entity) {
       if (err) {
-        cb(err);
+        if (!me.tries) {
+          me.tries = 0;
+        }
+        if (err.code === 409 && me.tries < 10) {
+          // message: 'too much contention on these datastore entities. please try again.',
+          // sleep for a second & try again
+          me.tries++;
+          var sleep = Math.floor(Math.random() * 5) + 1;
+          console.log('409 - going around again after %s seconds', sleep);
+          setTimeout(function() {
+            me.updateState(buildId, buildNumber, newState, cb);
+          }, 1000 * sleep);
+        } else {
+          me.tries = 0;
+          if (me.tries > 0) {
+            console.log('Too many tries - failing');
+          }
+          cb(err);
+        }
       } else {
+        me.tries = 0;
         entity.data.runs.forEach(function(run) {
           if (run.buildNumber === buildNumber) {
             run.state = newState;
