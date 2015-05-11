@@ -48,6 +48,7 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
         entity.data.runs.forEach(function(run) {
           if (run.buildNumber === buildNumber) {
             run.state = newState;
+            run.updated = new Date().getTime();
           }
         });
         transaction.update(entity);
