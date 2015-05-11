@@ -6,7 +6,12 @@ function ReadBuildData(repoName) {
   this.name = repoName;
   this.namespace = Util.makeBucketName(repoName);
   this.dataset = gcloud.datastore.dataset(Auth);
+  this.storage = gcloud.storage(Auth);
 }
+
+ReadBuildData.prototype.getBucketName = function() {
+  return this.namespace;
+};
 
 ReadBuildData.prototype.runQuery_ = function(query, cb) {
   this.dataset.runQuery(query, function(err, entities, endCursor, apiResponse) {
@@ -59,6 +64,42 @@ ReadBuildData.prototype.getAllPushBuilds = function(cb) {
 
 ReadBuildData.prototype.getAllPRBuilds = function(cb) {
   this.getStreamedBuilds_('pull_request', cb);
+};
+
+ReadBuildData.prototype.getAllFiles = function(hrerr, files, nextQuery, cb, soFar) {
+  if (hrerr) {
+    return cb(herr);
+  }
+
+  var me = this;
+  if (!soFar) {
+    soFar = [];
+  }
+
+  // Extract results
+  soFar = soFar.concat(files.map(function(f) { return f.name }));
+
+  if (nextQuery) {
+    this.bucket.getFiles(nextQuery, function(err, files, next) {
+      me.getAllFiles(err, files, next, cb, soFar);
+    });
+  } else {
+    cb(null, soFar);
+  }
+};
+
+ReadBuildData.prototype.getBranches = function(cb) {
+  this.bucket = this.storage.bucket(this.getBucketName());
+  var me = this;
+
+  // Get all the cache files for this repo+branch combination
+  //  see 'saveLogs.js' in sivart-slave for where this stuff is saved
+  this.bucket.getFiles({ prefix: 'branch-' }, function(err, files, next) {
+    me.getAllFiles(err, files, next, function(err, files) {
+      // get rid of all 'cache-' files - the rest are branches
+      cb(null, files);
+    });
+  });
 };
 
 module.exports = ReadBuildData;
