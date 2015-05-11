@@ -66,7 +66,7 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
       } else {
         me.tries = 0;
         entity.data.runs.forEach(function(run) {
-          if (run.buildNumber === buildNumber) {
+          if (run.buildNumber === parseInt(buildNumber)) {
             run.state = newState;
             run.updated = new Date().getTime();
           }
