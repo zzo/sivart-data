@@ -127,44 +127,53 @@ ReadBuildData.prototype.getFilenamesInDirectory = function(directory, cb) {
   });
 };
 
+ReadBuildData.prototype.makeBranchName = function(branch) {
+  return ['branch', branch].join('-');
+};
+
 ReadBuildData.prototype.getBuilds = function(branch, cb) {
-  var branchPrefix = ['branch', branch].join('-');
+  var branchPrefix = this.makeBranchName(branch);
   this.getFilenamesInDirectory(branchPrefix, cb);
 };
 
 ReadBuildData.prototype.getBuildNumbers = function(branch, buildId, cb) {
-  var branchPrefix = path.join(['branch', branch].join('-'), String(buildId));
+  var branch = this.makeBranchName(branch);
+  var branchPrefix = path.join(branch, String(buildId));
   this.getFilenamesInDirectory(branchPrefix, cb);
 };
 
 ReadBuildData.prototype.getBuildFilenames = function(branch, buildId, buildNumber, cb) {
-  var branchPrefix = path.join(['branch', branch].join('-'), String(buildId), String(buildNumber));
+  var branch = this.makeBranchName(branch);
+  var branchPrefix = path.join(branch, String(buildId), String(buildNumber));
   this.getFilenamesInDirectory(branchPrefix, cb);
 };
 
+ReadBuildData.prototype.getFile = function(branch, filename, cb) {
+  this.bucket = this.storage.bucket(this.getBucketName());
+  var branch = this.makeBranchName(branch);
+  var fullFilename = path.join(branch, filename);
+  var file = this.bucket.file(fullFilename);
+  file.download(cb);
+};
 
-ReadBuildData.prototype.findBranch = function(buildId, cb) {
+ReadBuildData.prototype.getMainLogFile = function(branch, buildId, buildNumber, cb) {
+  this.getLogFile(branch, buildId, buildNumber, 'user-script.log', cb);
+};
+
+ReadBuildData.prototype.getLastLog = function(branch, buildId, buildNumber, cb) {
   var me = this;
-
-  this.getBranches(function(err, branches) {
-    if (err) {
-      cb(err);
-    } else {
-      branches.forEach(function(branch) {
-        me.getBuilds(branch, function(err, builds) {
-          if (err) {
-            cb(err);
-          } else {
-            builds.forEach(function(build) {
-              if (build == buildId) {
-                return cb(null, branch);
-              }
-            });
-          }
-        });
-      });
-    }
+  this.getBuildFilenames(branch, buildId, buildNumber, function(err, files) {
+    var logs = files.filter(function(filename) {
+      return filename.match(/\d+\.\d+\.log/);
+    });
+    me.getLogFile(branch, buildId, buildNumber, path.basename(logs[logs.length - 1]), cb);
   });
 };
- 
+
+ReadBuildData.prototype.getLogFile = function(branch, buildId, buildNumber, filename, cb) {
+  var logFile = path.join(String(buildId), String(buildNumber), filename);
+  console.log('getting file: ' + logFile);
+  this.getFile(branch, logFile, cb);
+};
+
 module.exports = ReadBuildData;
