@@ -46,12 +46,29 @@ describe("ReadBuildData", function() {
     });
   });
 
-  it("can get build results", function(done) {
-    rbd = new ReadBuildData('test/repo');
-    rbd.getBuildResults('foobie', 1, function(err, resultFiles) {
-      console.log('build files');
-      console.log(resultFiles);
+});
+
+describe("ReadBuildData", function() {
+  var rbd;
+
+  beforeEach(function() {
+    rbd = new ReadBuildData('angular/angular');
+  });
+
+  it("can get some push builds", function(done) {
+    rbd.getSomePushBuilds(function(err, buildData) {
+      expect(err).toBeNull();
+      console.log(buildData);
       done();
     });
   });
+
+  it("can get some PR builds", function(done) {
+    rbd.getSomePRBuilds(function(err, buildData) {
+      expect(err).toBeNull();
+      console.log(buildData);
+      done();
+    });
+  });
+
 });

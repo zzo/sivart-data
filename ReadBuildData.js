@@ -1,6 +1,7 @@
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
+var path = require('path');
 
 function ReadBuildData(repoName) {
   this.name = repoName;
@@ -20,7 +21,6 @@ ReadBuildData.prototype.runQuery_ = function(query, cb) {
     } else {
       var data = [];
       entities.forEach(function(entity) {
-        entity.data.__buildid = entity.key.path[1];
         data.push(entity.data);
       });
       if (data.length) {
@@ -102,40 +102,68 @@ ReadBuildData.prototype.getBranches = function(cb) {
       return prefix;
     });
     cb(err, prefixes);
-    /*
-    console.log(apiResponse);
-    me.getAllFiles(err, files, next, function(err, files) {
-      // get rid of all 'cache-' files - the rest are branches
-      cb(null, files);
-    });
-    */
+  });
+};
+
+ReadBuildData.prototype.getFilenamesInDirectory = function(directory, cb) {
+  this.bucket = this.storage.bucket(this.getBucketName());
+  console.log('get files from directory: ' + directory);
+  this.bucket.getFiles({ delimiter: '/', prefix: directory + '/' }, function(err, files, next, api) {
+    if (err) {
+      cb(err);
+    } else {
+      var filenames;
+      if (!files.length) {
+        filenames = api.prefixes.map(function(build) {
+          return build.replace(new RegExp(directory + '|\/', 'g'), '');
+        });
+      } else {
+        filenames = files.map(function(file) {
+          return file.name;
+        });
+      }
+      cb(null, filenames);
+    }
   });
 };
 
 ReadBuildData.prototype.getBuilds = function(branch, cb) {
-  this.bucket = this.storage.bucket(this.getBucketName());
-  var me = this;
-
   var branchPrefix = ['branch', branch].join('-');
-  this.bucket.getFiles({ delimiter: '/', prefix: branchPrefix + '/' }, function(err, files, next, api) {
-    var builds = api.prefixes;
-    builds = builds.map(function(build) {
-      return build.replace(new RegExp(branchPrefix+'|\/', 'g'), '');
-    });
-    cb(null, builds);
-  });
+  this.getFilenamesInDirectory(branchPrefix, cb);
 };
- 
-ReadBuildData.prototype.getBuildRuns = function(branch, buildNumber, cb) {
-  this.bucket = this.storage.bucket(this.getBucketName());
+
+ReadBuildData.prototype.getBuildNumbers = function(branch, buildId, cb) {
+  var branchPrefix = path.join(['branch', branch].join('-'), String(buildId));
+  this.getFilenamesInDirectory(branchPrefix, cb);
+};
+
+ReadBuildData.prototype.getBuildFilenames = function(branch, buildId, buildNumber, cb) {
+  var branchPrefix = path.join(['branch', branch].join('-'), String(buildId), String(buildNumber));
+  this.getFilenamesInDirectory(branchPrefix, cb);
+};
+
+
+ReadBuildData.prototype.findBranch = function(buildId, cb) {
   var me = this;
 
-  var branchPrefix = [['branch', branch].join('-'), buildNumber].join('/');
-  this.bucket.getFiles({ prefix: branchPrefix }, function(err, files, next, api) {
-    me.getAllFiles(err, files, next, function(err, files) {
-      files.shift();
-      cb(null, files);
-    });
+  this.getBranches(function(err, branches) {
+    if (err) {
+      cb(err);
+    } else {
+      branches.forEach(function(branch) {
+        me.getBuilds(branch, function(err, builds) {
+          if (err) {
+            cb(err);
+          } else {
+            builds.forEach(function(build) {
+              if (build == buildId) {
+                return cb(null, branch);
+              }
+            });
+          }
+        });
+      });
+    }
   });
 };
  
