@@ -19,19 +19,19 @@ WriteBuildData.prototype.getBucketName = function() {
 };
 
 // Write out what happened
-WriteBuildData.prototype.store = function(buildInfo, rawBuildRequest, cb) {
+WriteBuildData.prototype.store = function(runs, rawBuildRequest, buildData, cb) {
   if (!this.buildId) {
     var me = this;
     this.getNextBuildNumber(function(err) {
       if (err) {
        cb(err);
       } else {
-        me.store(buildInfo, rawBuildRequest, cb);
+        me.store(runs, rawBuildRequest, buildData, cb);
       }
     });
   } else {
     var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, this.buildId ]});
-    var dataToStore = Util.cleanDatastoreContents({ buildId: this.buildId, runs: buildInfo, rawBuildRequest: rawBuildRequest });
+    var dataToStore = Util.cleanDatastoreContents({ buildData: buildData, runs: runs, rawBuildRequest: rawBuildRequest });
     var entity = { key: key, data: dataToStore };
     this.dataset.save(entity, cb);
   }
