@@ -34,12 +34,15 @@ ReadBuildData.prototype.findBuild = function(buildId, cb) {
   });
 };
 
+// And determine overall build time while we're here
 ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
   var me = this;
   this.findBuild(buildId, function(err, build, kind) {
     if (err) {
       cb(err);
     } else {
+      // a state of 'running' does not necessarily mean this job is still running - it
+      //  may be done but its state/total running time as not yet been observed
       if (build.buildData.state === 'running') {
         var runResults = build.runs.map(function(run) {
           return { state: run.state, ignore: run.ignoreFailure };
@@ -49,9 +52,15 @@ ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
         var errored = false;
         var running = false;
         var passed = false;
+        var totalRunTime = 0;
         // individual buildNumber states:
         // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
         runResults.forEach(function(result) {
+          var runTime = 0;
+          if (result.updated) {
+            runTime = result.updated - result.created;
+          }
+          totalRunTime += runTime;
           if (!result.ignoreFailure) {
             if (result.state === 'fail') {
               failed = true;
@@ -76,14 +85,14 @@ ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
         var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
         if (!running) {
           var writeData = new WriteBuildData(me.name, kind);
-          writeData.updateOverallState(buildId, newState, function(uoserr) {
+          writeData.updateOverallState(buildId, newState, totalRunTime, function(uoserr) {
             cb(uoserr, newState);
           });
         } else {
-          cb(null, newState);
+          cb(null, newState, totalRunTime);
         }
       } else {
-        cb(null, build.buildData.state);
+        cb(null, build.buildData.state, build.buildData.totalRunTime);
       }
     }
   });

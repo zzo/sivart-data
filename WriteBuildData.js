@@ -66,7 +66,7 @@ WriteBuildData.prototype.retryHandler = function(funcToCall, retryCountProperty,
 };
 
 // Update overall build state
-WriteBuildData.prototype.updateOverallState = function(buildId, newState, cb) {
+WriteBuildData.prototype.updateOverallState = function(buildId, newState, totalRunTime, cb) {
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, buildId ]});
   this.dataset.runInTransaction(function(transaction, done) {
@@ -75,6 +75,7 @@ WriteBuildData.prototype.updateOverallState = function(buildId, newState, cb) {
         cb(err);
       } else {
         entity.data.buildData.state = newState;
+        entity.data.buildData.totalRunTime = totalRunTime;
         transaction.update(entity);
         done();
       }
