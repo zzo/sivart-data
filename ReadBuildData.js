@@ -5,6 +5,7 @@ var Util = require('./Util');
 var gcloud = require('gcloud');
 var path = require('path');
 var WriteBuildData = require('./WriteBuildData');
+var Q = require('Q');
 
 function ReadBuildData(repoName) {
   this.name = repoName;
@@ -34,6 +35,64 @@ ReadBuildData.prototype.findBuild = function(buildId, cb) {
   });
 };
 
+ReadBuildData.prototype.determineBuildState = function(build, kind, cb) {
+  if (build.buildData.state === 'running') {
+    var runResults = build.runs.map(function(run) {
+      return { state: run.state, ignore: run.ignoreFailure };
+    });
+    // Now figure it out!
+    var failed = false;
+    var errored = false;
+    var running = false;
+    var passed = false;
+    var totalRunTime = 0;
+    // individual buildNumber states:
+    // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
+    runResults.forEach(function(result) {
+      var runTime = 0;
+      if (result.updated) {
+        runTime = result.updated - result.created;
+      }
+      totalRunTime += runTime;
+      if (!result.ignoreFailure) {
+        if (result.state === 'fail') {
+          failed = true;
+        } else if (result.state === 'error') {
+          errored = true;
+        } else if (result.state === 'timeout' || result.state === 'exited') {
+          failed = true;
+        } else if (result.state === 'building' || result.state === 'running') {
+          running = true;
+        }
+      }
+    });
+
+    if (!failed && !errored && !running) {
+      passed = true;
+    } else if (failed && errored) {
+      // fail wins!
+      failed = false;
+    }
+
+    // Only update overall build when all builds are done
+    var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
+
+    build.buildData.state = newState;
+    build.buildData.totalRunTime = totalRunTime;
+
+    if (!running) {
+      var writeData = new WriteBuildData(this.name, kind);
+      writeData.updateOverallState(build.buildData.id, newState, totalRunTime, function(uoserr) {
+        cb(uoserr, newState, totalRunTime);
+      });
+    } else {
+      cb(null, newState, totalRunTime);
+    }
+  } else {
+    cb(null, build.buildData.state, build.buildData.totalRunTime);
+  }
+};
+
 // And determine overall build time while we're here
 ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
   var me = this;
@@ -41,59 +100,7 @@ ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
     if (err) {
       cb(err);
     } else {
-      // a state of 'running' does not necessarily mean this job is still running - it
-      //  may be done but its state/total running time as not yet been observed
-      if (build.buildData.state === 'running') {
-        var runResults = build.runs.map(function(run) {
-          return { state: run.state, ignore: run.ignoreFailure };
-        });
-        // Now figure it out!
-        var failed = false;
-        var errored = false;
-        var running = false;
-        var passed = false;
-        var totalRunTime = 0;
-        // individual buildNumber states:
-        // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
-        runResults.forEach(function(result) {
-          var runTime = 0;
-          if (result.updated) {
-            runTime = result.updated - result.created;
-          }
-          totalRunTime += runTime;
-          if (!result.ignoreFailure) {
-            if (result.state === 'fail') {
-              failed = true;
-            } else if (result.state === 'error') {
-              errored = true;
-            } else if (result.state === 'timeout' || result.state === 'exited') {
-              failed = true;
-            } else if (result.state === 'building' || result.state === 'running') {
-              running = true;
-            }
-          }
-        });
-
-        if (!failed && !errored && !running) {
-          passed = true;
-        } else if (failed && errored) {
-          // fail wins!
-          failed = false;
-        }
-
-        // Only update overall build when all builds are done
-        var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
-        if (!running) {
-          var writeData = new WriteBuildData(me.name, kind);
-          writeData.updateOverallState(buildId, newState, totalRunTime, function(uoserr) {
-            cb(uoserr, newState);
-          });
-        } else {
-          cb(null, newState, totalRunTime);
-        }
-      } else {
-        cb(null, build.buildData.state, build.buildData.totalRunTime);
-      }
+      me.determineBuildState(build, kind, cb);
     }
   });
 };
@@ -141,7 +148,22 @@ ReadBuildData.prototype.getMoreBuilds = function(moreObject, cb) {
 
 ReadBuildData.prototype.getSomeBuilds_ = function(type, cb) {
   var query = this.dataset.createQuery(this.namespace, [type]).limit(50);
-  this.runQuery_(query, cb);
+  var me = this;
+  this.runQuery_(query, function(err, builds) {
+    if (err) {
+      cb(err);
+    } else {
+      var promises = builds.map(function(build) {
+        return Q.ninvoke(me, 'determineBuildState', build, type);
+      });
+
+      // Execute and wait for all of them
+      Q.allSettled(promises).then(function(results) {
+        // TODO(trostler): look at 'results'
+        cb(null, builds);
+      });
+    }
+  });
 };
 
 ReadBuildData.prototype.getSomePushBuilds = function(cb) {
