@@ -12,6 +12,15 @@ describe("ReadBuildData", function() {
     expect(rbd).toBeDefined();
   });
 
+  it("can get a build", function(done) {
+    rbd = new ReadBuildData('angular/angular');
+    rbd.getABuild('push', 56, function(err, build) {
+      console.log('got build');
+      console.log(err || build);
+      done();
+    });
+  });
+
   it("can get push builds", function(done) {
     rbd.getAllPushBuilds(function(err, builds) {
       console.log('push builds');

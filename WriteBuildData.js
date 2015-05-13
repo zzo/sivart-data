@@ -37,7 +37,81 @@ WriteBuildData.prototype.store = function(runs, rawBuildRequest, buildData, cb) 
   }
 };
 
-// Update build state
+WriteBuildData.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
+  var me = this;
+  var cb = args[args.length - 1];
+  if (err) {
+    if (!me[retryCountProperty]) {
+      me[retryCountProperty] = 0;
+    }
+    if (err.code === 409 && me.utries < 10) {
+      // message: 'too much contention on these datastore entities. please try again.',
+      // sleep for a second & try again
+      me[retryCountProperty]++;
+      var sleep = Math.floor(Math.random() * 5) + 1;
+      console.log('409 - going around again after %s seconds', sleep);
+      setTimeout(function() {
+        funcToCall.apply(me, args);
+      }, 1000 * sleep);
+    } else {
+      if (me[retryCountProperty] > 0) {
+        console.log('Too many tries - failing');
+        me[retryCountProperty] = 0;
+      }
+      cb(err);
+    }
+  } else {
+    cb();
+  }
+};
+
+// Update overall build state
+WriteBuildData.prototype.updateOverallState = function(buildId, newState, cb) {
+  var me = this;
+  var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, buildId ]});
+  this.dataset.runInTransaction(function(transaction, done) {
+    transaction.get(key, function(err, entity) {
+      if (err) {
+        cb(err);
+      } else {
+        entity.data.buildData.state = newState;
+        transaction.update(entity);
+        done();
+      }
+    });
+  }, function(err) {
+    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, cb ], err);
+  });
+    /*
+  }, function(err) {
+    if (err) {
+      if (!me.utries) {
+        me.utries = 0;
+      }
+      if (err.code === 409 && me.utries < 10) {
+        // message: 'too much contention on these datastore entities. please try again.',
+        // sleep for a second & try again
+        me.utries++;
+        var sleep = Math.floor(Math.random() * 5) + 1;
+        console.log('409 - going around again after %s seconds', sleep);
+        setTimeout(function() {
+          me.updateOverallState(buildId, newState, cb);
+        }, 1000 * sleep);
+      } else {
+        if (me.utries > 0) {
+          console.log('Too many tries - failing');
+          me.utries = 0;
+        }
+        cb(err);
+      }
+    } else {
+      cb();
+    }
+  });
+  */
+};
+
+// Update an individual build run's state
 WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, cb) {
   var key = this.dataset.key({ namespace: this.namespace, path: [ this.kind, buildId ]});
   var me = this;
@@ -56,6 +130,10 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
         done();
       }
     });
+  }, function(err) {
+    me.retryHandler(me.updateState, 'tries', [ buildId, buildNumber, newState, cb ], err);
+  });
+  /*
   }, function(err) {
     if (err) {
       if (!me.tries) {
@@ -81,6 +159,7 @@ WriteBuildData.prototype.updateState = function(buildId, buildNumber, newState, 
       cb();
     }
   });
+  */
 };
 
 WriteBuildData.prototype.getNextBuildNumber = function(cb) {

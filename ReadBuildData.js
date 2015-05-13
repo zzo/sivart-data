@@ -4,6 +4,7 @@ var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
 var path = require('path');
+var WriteBuildData = require('./WriteBuildData');
 
 function ReadBuildData(repoName) {
   this.name = repoName;
@@ -14,6 +15,78 @@ function ReadBuildData(repoName) {
 
 ReadBuildData.prototype.getBucketName = function() {
   return this.namespace;
+};
+
+ReadBuildData.prototype.findBuild = function(buildId, cb) {
+  var me = this;
+  this.getABuild('pull_request', buildId, function(err, prbuild) {
+    if (err) {
+      me.getABuild('push', buildId, function(err2, pbuild) {
+        if (err2) {
+          cb('Cannot find build: ' + buildId);
+        } else {
+          cb(null, pbuild, 'push');
+        }
+      });
+    } else {
+      cb(null, prbuild, 'pull_request');
+    }
+  });
+};
+
+ReadBuildData.prototype.getOverallBuildStatus = function(buildId, cb) {
+  var me = this;
+  this.findBuild(buildId, function(err, build, kind) {
+    if (err) {
+      cb(err);
+    } else {
+      if (build.buildData.state === 'running') {
+        var runResults = build.runs.map(function(run) {
+          return { state: run.state, ignore: run.ignoreFailure };
+        });
+        // Now figure it out!
+        var failed = false;
+        var errored = false;
+        var running = false;
+        var passed = false;
+        // individual buildNumber states:
+        // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
+        runResults.forEach(function(result) {
+          if (!result.ignoreFailure) {
+            if (result.state === 'fail') {
+              failed = true;
+            } else if (result.state === 'error') {
+              errored = true;
+            } else if (result.state === 'timeout' || result.state === 'exited') {
+              failed = true;
+            } else if (result.state === 'building' || result.state === 'running') {
+              running = true;
+            }
+          }
+        });
+
+        if (!failed && !errored && !running) {
+          passed = true;
+        } else if (failed && errored) {
+          // fail wins!
+          failed = false;
+        }
+
+        // Only update overall build when all builds are done
+        var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
+        if (!running) {
+          var writeData = new WriteBuildData(me.name, kind);
+          writeData.updateOverallState(buildId, newState, function(uoserr) {
+            cb(uoserr, newState);
+          });
+        } else {
+          cb(null, newState);
+        }
+      } else {
+        cb(null, build.buildData.state);
+      }
+    }
+  });
 };
 
 ReadBuildData.prototype.runQuery_ = function(query, cb) {
@@ -43,7 +116,11 @@ ReadBuildData.prototype.getABuild = function(kind, buildId, cb) {
     if (err) {
       cb(err);
     } else {
-      cb(null, entity.data);
+      if (entity) {
+        cb(null, entity.data);
+      } else {
+        cb('Cannot find entity');
+      }
     }
   });
 };
@@ -110,8 +187,8 @@ ReadBuildData.prototype.getBranches = function(cb) {
 
   // Get all the cache files for this repo+branch combination
   //  see 'saveLogs.js' in sivart-slave for where this stuff is saved
-  this.bucket.getFiles({ delimiter: '/'  }, function(err, files, next, apiResponse) {
-    var prefixes = apiResponse.prefixes.map(function(prefix) { 
+  this.bucket.getFiles({ delimiter: '/' }, function(err, files, next, apiResponse) {
+    var prefixes = apiResponse.prefixes.map(function(prefix) {
       prefix = prefix.replace(/^branch-/, '');
       prefix = prefix.replace(/\/$/, '');
       return prefix;
@@ -122,7 +199,6 @@ ReadBuildData.prototype.getBranches = function(cb) {
 
 ReadBuildData.prototype.getFilenamesInDirectory = function(directory, cb) {
   this.bucket = this.storage.bucket(this.getBucketName());
-  console.log('get files from directory: ' + directory);
   this.bucket.getFiles({ delimiter: '/', prefix: directory + '/' }, function(err, files, next, api) {
     if (err) {
       cb(err);
@@ -178,16 +254,19 @@ ReadBuildData.prototype.getMainLogFile = function(branch, buildId, buildNumber, 
 ReadBuildData.prototype.getLastLog = function(branch, buildId, buildNumber, cb) {
   var me = this;
   this.getBuildFilenames(branch, buildId, buildNumber, function(err, files) {
-    var logs = files.filter(function(filename) {
-      return filename.match(/\d+\.\d+\.log/);
-    });
-    me.getLogFile(branch, buildId, buildNumber, path.basename(logs[logs.length - 1]), cb);
+    if (err) {
+      cb(err);
+    } else {
+      var logs = files.filter(function(filename) {
+        return filename.match(/\d+\.\d+\.log/);
+      });
+      me.getLogFile(branch, buildId, buildNumber, path.basename(logs[logs.length - 1]), cb);
+    }
   });
 };
 
 ReadBuildData.prototype.getLogFile = function(branch, buildId, buildNumber, filename, cb) {
   var logFile = path.join(String(buildId), String(buildNumber), filename);
-  console.log('getting file: ' + logFile);
   this.getFile(branch, logFile, cb);
 };
 

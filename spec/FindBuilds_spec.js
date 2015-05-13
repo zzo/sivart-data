@@ -12,6 +12,34 @@ describe('Get Builds', function() {
     rdb = new ReadBuildData('angular/angular');
   });
 
+  it('finds a build', function(done) {
+    rdb = new ReadBuildData('zzo/angular.js');
+    rdb.findBuild(2, function(err, build, which) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log('found build:');
+        console.log(build);
+        console.log(which);
+      }
+      done();
+    });
+  });
+
+  it('gets overall build status', function(done) {
+    rdb = new ReadBuildData('zzo/angular.js');
+    rdb.getOverallBuildStatus(2, function(err, state) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log('got state:');
+        console.log(state);
+      }
+      done();
+    });
+  });
+
+
   xit('get build numbers', function(done) {
     rdb.getBuildNumbers('master', 96, function(err, files) {
       expect(err).toBeNull();
@@ -28,7 +56,7 @@ describe('Get Builds', function() {
     });
   });
 
-  it('gets main log file', function(done) {
+  xit('gets main log file', function(done) {
     rdb = new ReadBuildData('zzo/angular');
     rdb.getMainLogFile('master', 12, 1, function(err, contents) {
       if (err) {
@@ -41,7 +69,7 @@ describe('Get Builds', function() {
     });
   });
 
-  it('gets last log file', function(done) {
+  xit('gets last log file', function(done) {
     rdb = new ReadBuildData('zzo/angular');
     rdb.getLastLog('master', 12, 1, function(err, contents) {
       if (err) {
