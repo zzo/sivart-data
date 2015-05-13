@@ -35,8 +35,17 @@ ReadBuildData.prototype.runQuery_ = function(query, cb) {
 };
 
 ReadBuildData.prototype.getABuild = function(kind, buildId, cb) {
-  var query = this.dataset.createQuery(this.namespace, [kind, buildId]);
-  this.runQuery_(query, cb);
+  var key = this.dataset.key({
+    namespace: this.namespace,
+    path: [kind, buildId]
+  });
+  this.dataset.get(key, function(err, entity) {
+    if (err) {
+      cb(err);
+    } else {
+      cb(null, entity.data);
+    }
+  });
 };
 
 ReadBuildData.prototype.getMoreBuilds = function(moreObject, cb) {
