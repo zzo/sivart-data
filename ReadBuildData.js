@@ -1,3 +1,5 @@
+'use strict';
+
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
@@ -15,9 +17,9 @@ ReadBuildData.prototype.getBucketName = function() {
 };
 
 ReadBuildData.prototype.runQuery_ = function(query, cb) {
-  this.dataset.runQuery(query, function(err, entities, endCursor, apiResponse) {
+  this.dataset.runQuery(query, function(err, entities, endCursor) {
     if (err) {
-      cb("Error fetching builds: " + err);
+      cb('Error fetching builds: ' + err);
     } else {
       var data = [];
       entities.forEach(function(entity) {
@@ -30,6 +32,11 @@ ReadBuildData.prototype.runQuery_ = function(query, cb) {
       }
     }
   });
+};
+
+ReadBuildData.prototype.getABuild = function(kind, buildId, cb) {
+  var query = this.dataset.createQuery(this.namespace, [kind, buildId]);
+  this.runQuery_(query, cb);
 };
 
 ReadBuildData.prototype.getMoreBuilds = function(moreObject, cb) {
@@ -56,7 +63,7 @@ ReadBuildData.prototype.getStreamedBuilds_ = function(which, cb) {
   this.dataset.runQuery(query)
     .on('data', function(entity) { data.push(entity.data); })
     .on('error', function(err) { cb(err); })
-    .on('end', function() { cb(null, data); })
+    .on('end', function() { cb(null, data); });
 };
 
 ReadBuildData.prototype.getAllPushBuilds = function(cb) {
@@ -67,8 +74,8 @@ ReadBuildData.prototype.getAllPRBuilds = function(cb) {
   this.getStreamedBuilds_('pull_request', cb);
 };
 
-ReadBuildData.prototype.getAllFiles = function(hrerr, files, nextQuery, cb, soFar) {
-  if (hrerr) {
+ReadBuildData.prototype.getAllFiles = function(herr, files, nextQuery, cb, soFar) {
+  if (herr) {
     return cb(herr);
   }
 
@@ -78,11 +85,11 @@ ReadBuildData.prototype.getAllFiles = function(hrerr, files, nextQuery, cb, soFa
   }
 
   // Extract results
-  soFar = soFar.concat(files.map(function(f) { return f.name }));
+  soFar = soFar.concat(files.map(function(f) { return f.name; }));
 
   if (nextQuery) {
-    this.bucket.getFiles(nextQuery, function(err, files, next) {
-      me.getAllFiles(err, files, next, cb, soFar);
+    this.bucket.getFiles(nextQuery, function(err, gfiles, next) {
+      me.getAllFiles(err, gfiles, next, cb, soFar);
     });
   } else {
     cb(null, soFar);
@@ -91,7 +98,6 @@ ReadBuildData.prototype.getAllFiles = function(hrerr, files, nextQuery, cb, soFa
 
 ReadBuildData.prototype.getBranches = function(cb) {
   this.bucket = this.storage.bucket(this.getBucketName());
-  var me = this;
 
   // Get all the cache files for this repo+branch combination
   //  see 'saveLogs.js' in sivart-slave for where this stuff is saved
@@ -137,20 +143,20 @@ ReadBuildData.prototype.getBuilds = function(branch, cb) {
 };
 
 ReadBuildData.prototype.getBuildNumbers = function(branch, buildId, cb) {
-  var branch = this.makeBranchName(branch);
+  branch = this.makeBranchName(branch);
   var branchPrefix = path.join(branch, String(buildId));
   this.getFilenamesInDirectory(branchPrefix, cb);
 };
 
 ReadBuildData.prototype.getBuildFilenames = function(branch, buildId, buildNumber, cb) {
-  var branch = this.makeBranchName(branch);
+  branch = this.makeBranchName(branch);
   var branchPrefix = path.join(branch, String(buildId), String(buildNumber));
   this.getFilenamesInDirectory(branchPrefix, cb);
 };
 
 ReadBuildData.prototype.getFile = function(branch, filename, cb) {
   this.bucket = this.storage.bucket(this.getBucketName());
-  var branch = this.makeBranchName(branch);
+  branch = this.makeBranchName(branch);
   var fullFilename = path.join(branch, filename);
   var file = this.bucket.file(fullFilename);
   file.download(cb);
