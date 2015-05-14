@@ -6,26 +6,21 @@ var gcloud = require('gcloud');
 var Q = require('q');
 var path = require('path');
 
-function WriteBuildData(repoName, githubEvent) {
+function Filestore(repoName) {
   this.name = repoName;
-  this.kind = githubEvent;
-  this.namespace = Util.makeBucketName(repoName);
-  this.dataset = gcloud.datastore.dataset(Auth);
+  this.bucketName = Util.makeBucketName(repoName);
   this.storage = gcloud.storage(Auth);
+  this.bucket = this.storage.bucket(this.bucketName);
 }
-
-WriteBuildData.prototype.getBucketName = function() {
-  return this.namespace;
-};
 
 /*
  * All files in fileList are stored in the 'prefix' directory in the bucket
  */
-WriteBuildData.prototype.writeFilesToBucket = function(prefix, fileList, cb) {
+Filestore.prototype.persistFiles = function(prefix, fileList, cb) {
   var me = this;
   // Array of function calls that return promises to save each file
   var promises = fileList.map(function(file) {
-    return Q.ninvoke(me, 'writeFileToBucket', file, path.join(prefix, path.basename(file)));
+    return Q.ninvoke(me, 'persistFile', file, path.join(prefix, path.basename(file)));
   });
 
   // Execute and wait for all of them
@@ -57,20 +52,40 @@ WriteBuildData.prototype.writeFilesToBucket = function(prefix, fileList, cb) {
   });
 };
 
-WriteBuildData.prototype.writeFileToBucket = function(from, to, cb) {
+Filestore.prototype.persistFile = function(from, to, cb) {
   var me = this;
   var options = {
     destination: to
   };
-  this.storage.createBucket(this.getBucketName(), function(err, bucket) {
+  this.storage.createBucket(this.bucketName, function(err, bucket) {
     if (err) {
       // Asume bucket already exists
       // TODO(trostler): verify that's true!
-      bucket = me.storage.bucket(me.getBucketName());
+      bucket = me.storage.bucket(me.bucketName);
     }
 
     bucket.upload(from, options, cb);
   });
 };
 
-module.exports = WriteBuildData;
+Filestore.prototype.makeBranchName = function(branch) {
+  return ['branch', branch].join('-');
+};
+
+Filestore.prototype.getFile = function(branch, filename, cb) {
+  branch = this.makeBranchName(branch);
+  var fullFilename = path.join(branch, filename);
+  var file = this.bucket.file(fullFilename);
+  file.download(cb);
+};
+
+Filestore.prototype.getLogFile = function(branch, buildId, buildNumber, filename, cb) {
+  var logFile = path.join(String(buildId), String(buildNumber), filename);
+  this.getFile(branch, logFile, cb);
+};
+
+Filestore.prototype.getMainLogFile = function(branch, buildId, buildNumber, cb) {
+  this.getLogFile(branch, buildId, buildNumber, 'user-script.log', cb);
+};
+
+module.exports = Filestore;
