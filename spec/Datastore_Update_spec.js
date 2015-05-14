@@ -10,24 +10,51 @@ var metadata = {
   branch: 'master'
 };
 
+var TIME_DIFF = 5000;
+var now = new Date().getTime();
+var done = now + TIME_DIFF;
+
 var runs = [
   {
     buildNumber: 1,
+    created: now,
+    updated: done
+  },
+  {
+    buildNumber: 2,
+    created: now,
+    updated: done
   }
 ];
 
 
 describe('Datastore update states', function() {
   var datastore;
+  var buildId;
 
-  beforeEach(function() {
+  beforeEach(function(done) {
     datastore = new Datastore('zzo/angular');
+    datastore.getNextBuildNumber(function(err, number) {
+      buildId = number;
+      expect(err).toBeNull();
+      datastore.saveInitialData(runs, {}, metadata, function(err, resp) {
+        done();
+      });
+    });
+  });
+
+  it('gets total runtime', function(done) {
+    datastore.getTotalRunTime(buildId, function(err, totalTime) {
+      expect(err).toBeNull();
+      expect(totalTime).toBe(TIME_DIFF * 2); // there are 2 runs
+      done();
+    });
   });
 
   it('updates an overall state', function(done) {
     var now = new Date().getTime();
-    datastore.updateOverallState(69, String(now), now, function(err, data) {
-      datastore.getABuild(69, function(err, build) {
+    datastore.updateOverallState(buildId, String(now), now, function(err, data) {
+      datastore.getABuild(buildId, function(err, build) {
         expect(err).toBeNull();
         expect(build.buildData.state).toBe(String(now));
         expect(build.buildData.totalRunTime).toBe(now);
@@ -38,19 +65,12 @@ describe('Datastore update states', function() {
 
   it('updates a run state', function(done) {
     var now = new Date().getTime();
-    datastore.getNextBuildNumber(function(err, number) {
-      expect(err).toBeNull();
-      datastore.saveInitialData(runs, {}, metadata, function(err, resp) {
+    datastore.updateRunState(buildId, 1, String(now), function(err, data) {
+      datastore.getABuild(buildId, function(err, build) {
         expect(err).toBeNull();
-
-        datastore.updateRunState(number, 1, String(now), function(err, data) {
-          datastore.getABuild(number, function(err, build) {
-            expect(err).toBeNull();
-            expect(build.runs[0].state).toBe(String(now));
-            expect(build.runs[0].updated).toBeGreaterThan(now);
-            done();
-          });
-        });
+        expect(build.runs[0].state).toBe(String(now));
+        expect(build.runs[0].updated).toBeGreaterThan(now);
+        done();
       });
     });
   });

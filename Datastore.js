@@ -128,6 +128,33 @@ Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTim
   });
 };
 
+// Get overall build time
+Datastore.prototype.getTotalRunTime = function(buildId, cb) {
+  this.getABuild(buildId, function(err, build) {
+    if (build.buildData.state === 'running') {
+      if (err) {
+        cb(err);
+      } else {
+        var totalTime = build.runs.reduce(function(timeSoFar, run) {
+          var updated = run.updated;
+          if (!updated) {
+            // run hasn't hit first update yet
+            updated = new Date().getTime();
+          }
+          return timeSoFar + (updated - run.created);
+        }, 0);
+        cb(null, totalTime);
+      }
+    } else {
+      cb(null, build.buildData.totalRunTime);
+    }
+ });
+};
+
+// set 'state' and 'totalTime' for build
+Datastore.prototype.updateBuildState = function(buildId, cb) {
+};
+
 Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
   var me = this;
   var cb = args[args.length - 1];
