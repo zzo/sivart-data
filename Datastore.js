@@ -3,7 +3,7 @@
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
-var Q = require('Q');
+var Q = require('q');
 
 function Datastore(repoName) {
   this.name = repoName;
@@ -241,7 +241,7 @@ Datastore.prototype.determineBuildState = function(build, cb) {
     build.buildData.totalRunTime = totalRunTime;
 
     if (!running) {
-      // If this build is done then persis the build state and total time
+      // If this build is done then persist the build state and total time
       this.updateOverallState(build.buildData.id, newState, totalRunTime, function(uoserr) {
         cb(uoserr, newState, totalRunTime);
       });
