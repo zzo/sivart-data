@@ -3,6 +3,7 @@
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
+var Q = require('Q');
 
 function Datastore(repoName) {
   this.name = repoName;
@@ -49,18 +50,30 @@ Datastore.prototype.getNextBuildNumber = function(cb) {
 };
 
 Datastore.prototype.getBuildType = function(type, cb) {
+  var me = this;
   var query = this.dataset.createQuery(this.namespace, ['build']).limit(50);
 
   this.dataset.runQuery(query, function(err, entities) {
     if (err) {
       cb(err);
     } else {
+      // Filter out only the builds we're interested in
       var builds = entities.filter(function(entity) {
         return entity.data.buildData.kind === type;
       });
-      cb(null, builds.map(function(build) {
-        return build.data;
-      }));
+
+      // Determine their build state
+      var promises = builds.map(function(build) {
+        return Q.ninvoke(me, 'determineBuildState', build.data);
+      });
+
+      // When that's done return the builds
+      Q.allSettled(promises).then(function(/*results*/) {
+        // TODO(trostler): look at 'results' to ensure nothing went haywire
+        cb(null, builds.map(function(build) {
+          return build.data;
+        }));
+      });
     }
   });
 };
@@ -151,10 +164,6 @@ Datastore.prototype.getTotalRunTime = function(buildId, cb) {
  });
 };
 
-// set 'state' and 'totalTime' for build
-Datastore.prototype.updateBuildState = function(buildId, cb) {
-};
-
 Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
   var me = this;
   var cb = args[args.length - 1];
@@ -180,6 +189,68 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
     }
   } else {
     cb();
+  }
+};
+
+Datastore.prototype.determineBuildState = function(build, cb) {
+  if (build.buildData.state === 'running') {
+    // Now figure it out!
+    var failed = false;
+    var errored = false;
+    var running = false;
+    var totalRunTime = 0;
+    // individual buildNumber states:
+    build.runs.forEach(function(result) {
+
+      // First add to total build time
+      var runTime = 0;
+      if (result.updated) {
+        runTime = result.updated - result.created;
+      } else {
+        runTime = new Date().getTime() - result.created;
+      }
+      totalRunTime += runTime;
+
+      // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
+      if (!result.ignoreFailure) {
+        if (result.state === 'fail') {
+          failed = true;
+        } else if (result.state === 'error') {
+          errored = true;
+        } else if (result.state === 'timeout' || result.state === 'exited') {
+          failed = true;
+        } else if (result.state === 'building' || result.state === 'running') {
+          running = true;
+        }
+      }
+    });
+
+    var passed = false;
+    if (!failed && !errored && !running) {
+      passed = true;
+    } else if (failed && errored) {
+      // fail wins!  Need to have a single value for the overall build state
+      failed = false;
+    }
+
+    // Only update overall build when all builds are done
+    var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
+
+    // Just stick these values here for the case that we don't persist the values
+    build.buildData.state = newState;
+    build.buildData.totalRunTime = totalRunTime;
+
+    if (!running) {
+      // If this build is done then persis the build state and total time
+      this.updateOverallState(build.buildData.id, newState, totalRunTime, function(uoserr) {
+        cb(uoserr, newState, totalRunTime);
+      });
+    } else {
+      // Otherwise just return the values
+      cb(null, newState, totalRunTime);
+    }
+  } else {
+    cb(null, build.buildData.state, build.buildData.totalRunTime);
   }
 };
 
