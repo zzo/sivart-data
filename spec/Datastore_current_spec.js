@@ -7,7 +7,7 @@ describe('Datastore current', function() {
   var datastore;
 
   beforeEach(function() {
-    datastore = new Datastore('zzo/angular.js');
+    datastore = new Datastore('zzo/angular');
   });
 
   it('gets the next build #', function(done) {

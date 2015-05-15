@@ -56,9 +56,10 @@ Datastore.prototype.getCurrentBuild = function(cb) {
     if (err) {
       cb(err);
     } else {
-      if (!entities) {
+      if (!entities || !entities.length) {
         cb('No build!');
       } else {
+        console.log(entities);
         var build = entities[0].data;
         me.determineBuildState(build, function(dbserr, newState, totalRunTime) {
           if (dbserr) {
