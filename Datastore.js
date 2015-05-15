@@ -49,28 +49,26 @@ Datastore.prototype.getNextBuildNumber = function(cb) {
   });
 };
 
-Datastore.prototype.getCurrentBuild = function(cb) {
-  var query = this.dataset.createQuery(this.namespace, ['build']).limit(1);
+Datastore.prototype.getCurrentBuildId = function(cb) {
+  var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });
+  var query = this.dataset.createQuery(this.namespace, key.path);
   var me = this;
   this.dataset.runQuery(query, function(err, entities) {
+    if (entities.length) {
+      cb(null, entities[0].data.value);
+    } else {
+      cb(err || me.namespace + ' does not exist?');
+    }
+  });
+};
+
+Datastore.prototype.getCurrentBuild = function(cb) {
+  var me = this;
+  this.getCurrentBuildId(function(err, id) {
     if (err) {
       cb(err);
     } else {
-      if (!entities || !entities.length) {
-        cb('No build!');
-      } else {
-        console.log(entities);
-        var build = entities[0].data;
-        me.determineBuildState(build, function(dbserr, newState, totalRunTime) {
-          if (dbserr) {
-            cb(dbserr);
-          } else {
-            build.buildData.state = newState;
-            build.buildData.totalRunTime = totalRunTime;
-            cb(null, build);
-          }
-        });
-      }
+      me.getABuild(id, cb);
     }
   });
 };
@@ -113,11 +111,21 @@ Datastore.prototype.getSomePRBuilds = function(cb) {
 };
 
 Datastore.prototype.getABuild = function(buildId, cb) {
-  this.dataset.get({ namespace: this.namespace, path: ['build', String(buildId) ] }, function(err, build) {
+  var me = this;
+  this.dataset.get({ namespace: this.namespace, path: ['build', String(buildId) ] }, function(err, builds) {
     if (err) {
       cb(err);
-    } else if (build) {
-      cb(null, build.data);
+    } else if (builds) {
+      var build = builds.data;
+      me.determineBuildState(build, function(dbserr, newState, totalRunTime) {
+        if (dbserr) {
+          cb(dbserr);
+        } else {
+          build.buildData.state = newState;
+          build.buildData.totalRunTime = totalRunTime;
+          cb(null, build);
+        }
+      });
     } else {
       cb('Build ' + buildId + ' does not exist');
     }
@@ -165,29 +173,6 @@ Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTim
   }, function(err) {
     me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, cb ], err);
   });
-};
-
-// Get overall build time
-Datastore.prototype.getTotalRunTime = function(buildId, cb) {
-  this.getABuild(buildId, function(err, build) {
-    if (build.buildData.state === 'running') {
-      if (err) {
-        cb(err);
-      } else {
-        var totalTime = build.runs.reduce(function(timeSoFar, run) {
-          var updated = run.updated;
-          if (!updated) {
-            // run hasn't hit first update yet
-            updated = new Date().getTime();
-          }
-          return timeSoFar + (updated - run.created);
-        }, 0);
-        cb(null, totalTime);
-      }
-    } else {
-      cb(null, build.buildData.totalRunTime);
-    }
- });
 };
 
 Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
