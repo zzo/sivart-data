@@ -49,6 +49,31 @@ Datastore.prototype.getNextBuildNumber = function(cb) {
   });
 };
 
+Datastore.prototype.getCurrentBuild = function(cb) {
+  var query = this.dataset.createQuery(this.namespace, ['build']).limit(1);
+  var me = this;
+  this.dataset.runQuery(query, function(err, entities) {
+    if (err) {
+      cb(err);
+    } else {
+      if (!entities) {
+        cb('No build!');
+      } else {
+        var build = entities[0].data;
+        me.determineBuildState(build, function(dbserr, newState, totalRunTime) {
+          if (dbserr) {
+            cb(dbserr);
+          } else {
+            build.buildData.state = newState;
+            build.buildData.totalRunTime = totalRunTime;
+            cb(null, build);
+          }
+        });
+      }
+    }
+  });
+};
+
 Datastore.prototype.getBuildType = function(type, cb) {
   var me = this;
   var query = this.dataset.createQuery(this.namespace, ['build']).limit(50);
