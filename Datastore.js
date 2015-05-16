@@ -248,12 +248,12 @@ Datastore.prototype.determineBuildState = function(build, cb) {
     var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
 
     // Just stick these values here for the case that we don't persist the values
-    build.buildData.state = newState;
     build.buildData.totalRunTime = totalRunTime;
 
     if (!running) {
       // If this build is done then persist the build state and total time
       this.updateOverallState(build.buildData.id, newState, totalRunTime, function(uoserr) {
+        build.buildData.state = newState;
         cb(uoserr, newState, totalRunTime);
       });
     } else {
