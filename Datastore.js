@@ -171,7 +171,7 @@ Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTim
       }
     });
   }, function(err) {
-    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, cb ], err);
+    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, totalRunTime, cb ], err);
   });
 };
 
