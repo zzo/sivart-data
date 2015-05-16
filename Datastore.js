@@ -258,7 +258,12 @@ Datastore.prototype.determineBuildState = function(build, cb) {
       });
     } else {
       // Otherwise just return the values
-      cb(null, newState, totalRunTime);
+      // Should we pass back the newState even though the job is still running?
+      //  If a non-igoreFailure job has already failed but other runs are still running
+      //    what should be pass back?  failure/error or running???
+      //  'running' makes more sense but newState is more accurate...  travis does 'running'
+      // cb(null, newState, totalRunTime);
+      cb(null, 'running', totalRunTime);
     }
   } else {
     cb(null, build.buildData.state, build.buildData.totalRunTime);
