@@ -95,7 +95,7 @@ Filestore.prototype.getLogFile = function(branch, buildId, buildNumber, filename
 };
 
 Filestore.prototype.getMainLogFile = function(branch, buildId, buildNumber, cb) {
-  this.getLogFile(branch, buildId, buildNumber, 'user-script.log', cb);
+  this.getLogFile(branch, buildId, buildNumber, 'user-script.clean.log', cb);
 };
 
 module.exports = Filestore;
