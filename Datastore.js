@@ -3,7 +3,6 @@
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
-var Q = require('q');
 
 function Datastore(repoName) {
   this.name = repoName;
@@ -62,6 +61,9 @@ Datastore.prototype.getCurrentBuildId = function(cb) {
   });
 };
 
+/*
+ * used by UI
+ */
 Datastore.prototype.getCurrentBuild = function(cb) {
   var me = this;
   this.getCurrentBuildId(function(err, id) {
@@ -74,30 +76,20 @@ Datastore.prototype.getCurrentBuild = function(cb) {
 };
 
 Datastore.prototype.getBuildType = function(type, cb) {
-  var me = this;
   var query = this.dataset.createQuery(this.namespace, ['build']).limit(50);
 
   this.dataset.runQuery(query, function(err, entities) {
     if (err) {
       cb(err);
-    } else {
+    } if (entities) {
       // Filter out only the builds we're interested in
-      var builds = entities.filter(function(entity) {
-        return entity.data.buildData.kind === type;
-      });
-
-      // Determine their build state
-      var promises = builds.map(function(build) {
-        return Q.ninvoke(me, 'determineBuildState', build.data);
-      });
-
-      // When that's done return the builds
-      Q.allSettled(promises).then(function(/*results*/) {
-        // TODO(trostler): look at 'results' to ensure nothing went haywire
-        cb(null, builds.map(function(build) {
-          return build.data;
-        }));
-      });
+      cb(null, entities.filter(function(entity) {
+        if (entity.data.buildData.kind === type) {
+          return entity.data;
+        }
+      }));
+    } else {
+      cb('No builds of type ' + type);
     }
   });
 };
@@ -111,27 +103,20 @@ Datastore.prototype.getSomePRBuilds = function(cb) {
 };
 
 Datastore.prototype.getABuild = function(buildId, cb) {
-  var me = this;
   this.dataset.get({ namespace: this.namespace, path: ['build', String(buildId) ] }, function(err, builds) {
     if (err) {
       cb(err);
     } else if (builds) {
-      var build = builds.data;
-      me.determineBuildState(build, function(dbserr, newState, totalRunTime) {
-        if (dbserr) {
-          cb(dbserr);
-        } else {
-          build.buildData.state = newState;
-          build.buildData.totalRunTime = totalRunTime;
-          cb(null, build);
-        }
-      });
+      cb(null, builds.data);
     } else {
       cb('Build ' + buildId + ' does not exist');
     }
   });
 };
 
+/*
+ * called by a script running on the slave instance
+ */
 Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb) {
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
   var me = this;
@@ -146,6 +131,12 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
             run.updated = new Date().getTime();
           }
         });
+        var results = me.determineOverallBuildState(entity.data);
+        if (results) {
+          // something has changed
+          entity.data.buildData.state = results[0];
+          entity.data.buildData.totalRunTime = results[1];
+        }
         transaction.update(entity);
         done();
       }
@@ -156,6 +147,7 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
 };
 
 // Update overall build state
+/*
 Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTime, cb) {
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
@@ -174,6 +166,7 @@ Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTim
     me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, totalRunTime, cb ], err);
   });
 };
+*/
 
 Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
   var me = this;
@@ -203,7 +196,7 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
   }
 };
 
-Datastore.prototype.determineBuildState = function(build, cb) {
+Datastore.prototype.determineOverallBuildState = function(build) {
   if (build.buildData.state === 'running') {
     // Now figure it out!
     var failed = false;
@@ -211,64 +204,45 @@ Datastore.prototype.determineBuildState = function(build, cb) {
     var running = false;
     var totalRunTime = 0;
     // individual buildNumber states:
-    build.runs.forEach(function(result) {
+    build.runs.forEach(function(run) {
 
       // First add to total build time
       var runTime = 0;
-      if (result.updated) {
-        runTime = result.updated - result.created;
+      if (run.updated) {
+        runTime = run.updated - run.created;
       } else {
-        runTime = new Date().getTime() - result.created;
+        runTime = new Date().getTime() - run.created;
       }
       totalRunTime += runTime;
 
-      // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail'
-      if (!result.ignoreFailure) {
-        if (result.state === 'fail') {
+      // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail', 'system'
+      if (!run.ignoreFailure) {
+        if (run.state === 'fail') {
           failed = true;
-        } else if (result.state === 'error') {
+        } else if (run.state === 'error' || run.state === 'system') {
           errored = true;
-        } else if (result.state === 'timeout' || result.state === 'exited') {
+        } else if (run.state === 'timeout' || run.state === 'exited') {
           failed = true;
-        } else if (result.state === 'building' || result.state === 'running') {
+        } else if (run.state === 'building' || run.state === 'running') {
           running = true;
         }
       }
     });
 
-    var passed = false;
+    var newState = 'running';
     if (!failed && !errored && !running) {
-      passed = true;
+      newState = 'passed';
     } else if (failed && errored) {
       // fail wins!  Need to have a single value for the overall build state
-      failed = false;
+      newState = 'failed';
+    } else if (errored) {
+      newState = 'errored';
+    } else if (failed) {
+      newState = 'failed';
     }
 
-    // Only update overall build when all builds are done
-    var newState = failed ? 'failed' : (errored ? 'errored' : (passed ? 'passed' : 'running' ));
-
-    // Just stick these values here for the case that we don't persist the values
-    build.buildData.totalRunTime = totalRunTime;
-
-    if (!running) {
-      // If this build is done then persist the build state and total time
-      this.updateOverallState(build.buildData.id, newState, totalRunTime, function(uoserr) {
-        build.buildData.state = newState;
-        cb(uoserr, newState, totalRunTime);
-      });
-    } else {
-      // Otherwise just return the values
-      // Should we pass back the newState even though the job is still running?
-      //  If a non-igoreFailure job has already failed but other runs are still running
-      //    what should be pass back?  failure/error or running???
-      //  'running' makes more sense but newState is more accurate...  travis does 'running'
-      // cb(null, newState, totalRunTime);
-      cb(null, 'running', totalRunTime);
-    }
-  } else {
-    cb(null, build.buildData.state, build.buildData.totalRunTime);
+    return [ newState, totalRunTime ];
   }
 };
-
 
 module.exports = Datastore;
