@@ -114,6 +114,18 @@ Datastore.prototype.getABuild = function(buildId, cb) {
   });
 };
 
+Datastore.prototype.getTotalRunTime = function(build) {
+  var total = 0;
+  build.runs.forEach(function(run) {
+    if (run.updated) {
+      total += run.updated - run.created;
+    } else {
+      total += new Date().getTime() - run.created;
+    }
+  });
+  return total;
+};
+
 /*
  * called by a script running on the slave instance
  */
@@ -125,17 +137,18 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
       if (err) {
         cb(err);
       } else {
-        entity.data.runs.forEach(function(run) {
+        var build = entity.data;
+        build.runs.forEach(function(run) {
           if (run.buildNumber === parseInt(buildNumber, 10)) {
             run.state = newState;
             run.updated = new Date().getTime();
           }
         });
-        var results = me.determineOverallBuildState(entity.data);
-        if (results) {
+        build.buildData.totalRunTime = me.getTotalRunTime(build);
+        var newOverallState = me.determineOverallBuildState(build);
+        if (newOverallState) {
           // something has changed
-          entity.data.buildData.state = results[0];
-          entity.data.buildData.totalRunTime = results[1];
+          build.buildData.state = newOverallState;
         }
         transaction.update(entity);
         done();
@@ -196,25 +209,19 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
   }
 };
 
+/*
+ * loop through all runs and see were we're at
+ * TODO(trostler): better state management for runs and overall
+ */
 Datastore.prototype.determineOverallBuildState = function(build) {
   if (build.buildData.state === 'running') {
     // Now figure it out!
     var failed = false;
     var errored = false;
     var running = false;
-    var totalRunTime = 0;
+
     // individual buildNumber states:
     build.runs.forEach(function(run) {
-
-      // First add to total build time
-      var runTime = 0;
-      if (run.updated) {
-        runTime = run.updated - run.created;
-      } else {
-        runTime = new Date().getTime() - run.created;
-      }
-      totalRunTime += runTime;
-
       // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail', 'system'
       if (!run.ignoreFailure) {
         if (run.state === 'fail') {
@@ -241,7 +248,7 @@ Datastore.prototype.determineOverallBuildState = function(build) {
       newState = 'failed';
     }
 
-    return [ newState, totalRunTime ];
+    return newState;
   }
 };
 
