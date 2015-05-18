@@ -64,7 +64,17 @@ Filestore.prototype.persistFile = function(from, to, cb) {
       bucket = me.storage.bucket(me.bucketName);
     }
 
-    bucket.upload(from, options, cb);
+    // Make bucket world-readable
+    bucket.acl.default.add({
+      entity: 'allUsers',
+      role: me.storage.acl.READER_ROLE
+    }, function(aerr /*, apiResponse*/) {
+      if (aerr) {
+        cb(aerr);
+      } else {
+        bucket.upload(from, options, cb);
+      }
+    });
   });
 };
 
