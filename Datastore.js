@@ -202,7 +202,6 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
       }, 1000 * sleep);
     } else {
       if (me[retryCountProperty] > 0) {
-        //console.log('Too many tries - failing');
         me[retryCountProperty] = 0;
       }
       cb(err);
