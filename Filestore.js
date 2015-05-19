@@ -82,6 +82,11 @@ Filestore.prototype.makeBranchName = function(branch) {
   return ['branch', branch].join('-');
 };
 
+Filestore.prototype.getBasePublicURL = function(branch, buildId, buildNumber) {
+  branch = this.makeBranchName(branch);
+  return path.join(this.bucketName, branch, String(buildId), String(buildNumber));
+};
+
 Filestore.prototype.getFile = function(branch, filename, cb) {
   branch = this.makeBranchName(branch);
   var fullFilename = path.join(branch, filename);
