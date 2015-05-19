@@ -84,9 +84,9 @@ Datastore.prototype.getBuildType = function(type, cb) {
     } if (entities) {
       // Filter out only the builds we're interested in
       cb(null, entities.filter(function(entity) {
-        if (entity.data.buildData.kind === type) {
-          return entity.data;
-        }
+        return entity.data.buildData.kind === type;
+        }).map(function(typeEntity) {
+          return typeEntity.data;
       }));
     } else {
       cb('No builds of type ' + type);
