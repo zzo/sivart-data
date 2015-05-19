@@ -222,13 +222,12 @@ Datastore.prototype.determineOverallBuildState = function(build) {
 
     // individual buildNumber states:
     build.runs.forEach(function(run) {
-      // 'building', 'running', 'exited', 'timeout', 'passed', 'error', 'fail', 'system'
       if (!run.ignoreFailure) {
-        if (run.state === 'fail') {
+        if (run.state === 'failed') {
           failed = true;
-        } else if (run.state === 'error' || run.state === 'system') {
+        } else if (run.state === 'errored' || run.state === 'system') {
           errored = true;
-        } else if (run.state === 'timeout' || run.state === 'exited') {
+        } else if (run.state === 'timedout' || run.state === 'exited') {
           failed = true;
         } else if (run.state === 'building' || run.state === 'running') {
           running = true;
