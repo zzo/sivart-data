@@ -236,15 +236,17 @@ Datastore.prototype.determineOverallBuildState = function(build) {
     });
 
     var newState = 'running';
-    if (!failed && !errored && !running) {
-      newState = 'passed';
-    } else if (failed && errored) {
-      // fail wins!  Need to have a single value for the overall build state
-      newState = 'failed';
-    } else if (errored) {
-      newState = 'errored';
-    } else if (failed) {
-      newState = 'failed';
+    if (!running) {
+      if (!failed && !errored && !running) {
+        newState = 'passed';
+      } else if (failed && errored) {
+        // fail wins!  Need to have a single value for the overall build state
+        newState = 'failed';
+      } else if (errored) {
+        newState = 'errored';
+      } else if (failed) {
+        newState = 'failed';
+      }
     }
 
     return newState;
