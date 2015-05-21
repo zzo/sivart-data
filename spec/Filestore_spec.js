@@ -83,7 +83,7 @@ describe("Filestore get and delete", function() {
   });
 });
 
-xdescribe("Filestore get branch", function() {
+describe("Filestore get branch", function() {
   var filestore;
 
   beforeEach(function() {
@@ -114,7 +114,7 @@ xdescribe("Filestore get branch", function() {
   });
 });
 
-xdescribe("Filestore get public URL", function() {
+describe("Filestore get public URL", function() {
   var filestore;
   filestore = new Filestore('angular/angular');
 

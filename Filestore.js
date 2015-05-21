@@ -4,7 +4,6 @@ var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
 var Q = require('q');
-var fs = require('fs');
 var path = require('path');
 
 function Filestore(repoName) {
@@ -83,24 +82,24 @@ Filestore.prototype.getMainLogFile = function(buildId, buildNumber, cb) {
   this.getLogFile(buildId, buildNumber, 'user-script.clean.log', cb);
 };
 
-Filestore.prototype.getFileList = function(path, cb) {
+Filestore.prototype.getFileList = function(filePath, cb) {
   this.bucket.getFiles({
-    prefix: path,
-    delimeter: '/',
+    prefix: filePath,
+    delimeter: '/'
   }, function(err, files, nextQuery, apiResponse) {
     if (err) {
       cb(err);
     } else {
-      var fiels = [];
+      var retFiles = [];
       if (apiResponse.items) {
-        files = apiResponse.items.map(function(item) {
+        retFiles = apiResponse.items.map(function(item) {
           return item.name;
         });
       }
-      cb(null, files);
+      cb(null, retFiles);
     }
   });
-}
+};
 
 Filestore.prototype.getBuildFileList = function(buildId, cb) {
   var me = this;
