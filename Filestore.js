@@ -4,6 +4,7 @@ var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
 var Q = require('q');
+var fs = require('fs');
 var path = require('path');
 
 function Filestore(repoName) {
@@ -22,34 +23,7 @@ Filestore.prototype.persistFiles = function(prefix, fileList, cb) {
   var promises = fileList.map(function(file) {
     return Q.ninvoke(me, 'persistFile', file, path.join(prefix, path.basename(file)));
   });
-
-  // Execute and wait for all of them
-  Q.allSettled(promises).then(function(results) {
-
-    var successResponses =
-      results
-        .filter(function(result) {
-          return result.state === 'fulfilled';
-        })
-        .map(function(success) {
-          return success.value;
-        });
-
-    var failedResponses =
-      results
-        .filter(function(result) {
-          return result.state === 'rejected';
-        })
-        .map(function(failed) {
-          return failed.reason;
-        });
-
-    if (failedResponses.length) {
-      cb(failedResponses, successResponses);
-    } else {
-      cb();
-    }
-  });
+  Util.dealWithAllPromises(promises, cb);
 };
 
 Filestore.prototype.persistFile = function(from, to, cb) {
@@ -101,6 +75,97 @@ Filestore.prototype.getLogFile = function(branch, buildId, buildNumber, filename
 
 Filestore.prototype.getMainLogFile = function(branch, buildId, buildNumber, cb) {
   this.getLogFile(branch, buildId, buildNumber, 'user-script.clean.log', cb);
+};
+
+Filestore.prototype.getFileList = function(path, cb) {
+  this.bucket.getFiles({
+    prefix: path,
+    delimeter: '/',
+  }, function(err, files, nextQuery, apiResponse) {
+    if (err) {
+      cb(err);
+    } else {
+      var fiels = [];
+      if (apiResponse.items) {
+        files = apiResponse.items.map(function(item) {
+          return item.name;
+        });
+      }
+      cb(null, files);
+    }
+  });
+}
+
+Filestore.prototype.getBuildFileList = function(branch, buildId, cb) {
+  branch = this.makeBranchName(branch);
+  var dirPath = path.join(branch, String(buildId));
+  this.getFileList(dirPath, cb);
+};
+
+Filestore.prototype.getRunFileList = function(branch, buildId, buildNumber, cb) {
+  branch = this.makeBranchName(branch);
+  var dirPath = path.join(branch, String(buildId), String(buildNumber));
+  this.getFileList(dirPath, cb);
+};
+
+Filestore.prototype.deleteFile = function(filename, cb) {
+  var file = this.bucket.file(filename);
+  file.delete(cb);
+};
+
+Filestore.prototype.deleteFiles = function(fileList, cb) {
+  var me = this;
+  var promises = fileList.map(function(file) {
+    return Q.ninvoke(me, 'deleteFile', file);
+  });
+  Util.dealWithAllPromises(promises, cb);
+};
+
+Filestore.prototype.deleteRunFiles = function(branch, buildId, buildNumber, cb) {
+  var me = this;
+  this.getRunFileList(branch, buildId, buildNumber, function(err, fileList) {
+    if (err) {
+      cb(err);
+    } else {
+      me.deleteFiles(fileList, cb);
+    }
+  });
+};
+
+Filestore.prototype.deleteBuildFiles = function(branch, buildId, cb) {
+  var me = this;
+  this.getBuildFileList(branch, buildId, function(err, fileList) {
+    if (err) {
+      cb(err);
+    } else {
+      me.deleteFiles(fileList, cb);
+    }
+  });
+};
+
+Filestore.prototype.getBranch = function(buildId, cb) {
+  this.getFileList('', function(err, list) {
+    if (err) {
+      cb(err);
+    } else {
+      var branch = list.reduce(function(previous, fileName) {
+        // try to match branch-(branch}/buildId
+        if (previous) {
+          return previous;
+        }
+        var regex = new RegExp('^branch-([^/]+)/' + buildId + '/');
+        var matches = regex.exec(fileName);
+        if (matches) {
+          return matches[1];
+        }
+      }, '');
+      if (!branch) {
+        cb('Cannot find branch for buildId ' + buildId);
+      } else {
+        cb(null, branch);
+      }
+    }
+  });
 };
 
 module.exports = Filestore;

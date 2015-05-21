@@ -127,7 +127,7 @@ Datastore.prototype.getTotalRunTime = function(build) {
 };
 
 /*
- * called by a script running on the slave instance
+ * called by a script running on the slave instance OR a rerun
  */
 Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb) {
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
@@ -140,7 +140,15 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
         var build = entity.data;
         build.runs.forEach(function(run) {
           if (run.buildNumber === parseInt(buildNumber, 10)) {
-            run.state = newState;
+            if (typeof newState === 'object') {
+              for (var k in newState) {
+                if (newState.hasOwnProperty(k)) {
+                  run[k] = newState[k];
+                }
+              }
+            } else if (typeof newState === 'string') {
+              run.state = newState;
+            }
             run.updated = new Date().getTime();
           }
         });
@@ -160,8 +168,7 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
 };
 
 // Update overall build state
-/*
-Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTime, cb) {
+Datastore.prototype.updateOverallState = function(buildId, newState, cb) {
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
   this.dataset.runInTransaction(function(transaction, done) {
@@ -170,16 +177,14 @@ Datastore.prototype.updateOverallState = function(buildId, newState, totalRunTim
         cb(err);
       } else {
         entity.data.buildData.state = newState;
-        entity.data.buildData.totalRunTime = totalRunTime;
         transaction.update(entity);
         done();
       }
     });
   }, function(err) {
-    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, totalRunTime, cb ], err);
+    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, cb ], err);
   });
 };
-*/
 
 Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
   var me = this;
@@ -193,10 +198,6 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
       // sleep for a second & try again
       me[retryCountProperty]++;
       var sleep = Math.floor(Math.random() * 5) + 1;
-      /*
-      console.log('error updating state - going around again after %s seconds', sleep);
-      console.log(err);
-      */
       setTimeout(function() {
         funcToCall.apply(me, args);
       }, 1000 * sleep);
@@ -253,6 +254,39 @@ Datastore.prototype.determineOverallBuildState = function(build) {
 
     return newState;
   }
+};
+
+// Get the startup script for a given buildId/buildNumber
+Datastore.prototype.getRun = function(buildId, buildNumber, cb) {
+  this.getABuild(buildId, function(err, build) {
+    if (err) {
+      cb(err);
+    } else {
+      var filteredRun = build.runs.filter(function(run) {
+        return run.buildNumber === parseInt(buildNumber, 10);
+      });
+      if (filteredRun[0]) {
+        cb(null, filteredRun[0]);
+      } else {
+        cb('Cannot find run #' + buildNumber);
+      }
+    }
+  });
+};
+
+// Get the startup script for a given buildId/buildNumber
+Datastore.prototype.getStartupScript = function(buildId, buildNumber, cb) {
+  this.getRun(buildId, buildNumber, function(err, run) {
+    if (err) {
+      cb(err);
+    } else {
+      var script = '';
+      run.script.slice(0).forEach(function(ch) {
+        script += String.fromCharCode(ch);
+      });
+      cb(null, script);
+    }
+  });
 };
 
 module.exports = Datastore;

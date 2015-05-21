@@ -1,3 +1,5 @@
+var Q = require('q');
+
 module.exports = {
 
   // Buckets must begin with [a-z] and cannot end with '-'
@@ -25,5 +27,33 @@ module.exports = {
     }));
 
     return data;
+  },
+
+  dealWithAllPromises: function(promises, cb) {
+    Q.allSettled(promises).then(function(results) {
+      var successResponses =
+        results
+          .filter(function(result) {
+            return result.state === 'fulfilled';
+          })
+          .map(function(success) {
+            return success.value;
+          });
+
+      var failedResponses =
+        results
+          .filter(function(result) {
+            return result.state === 'rejected';
+          })
+          .map(function(failed) {
+            return failed.reason;
+          });
+
+      if (failedResponses.length) {
+        cb(failedResponses, successResponses);
+      } else {
+        cb(null);
+      }
+    });
   }
 };
