@@ -197,7 +197,7 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
       // message: 'too much contention on these datastore entities. please try again.',
       // sleep for a second & try again
       me[retryCountProperty]++;
-      var sleep = Math.floor(Math.random() * 5) + 1;
+      var sleep = Math.floor(Math.random() * 10) + 1;
       setTimeout(function() {
         funcToCall.apply(me, args);
       }, 1000 * sleep);
