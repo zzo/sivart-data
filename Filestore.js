@@ -61,20 +61,26 @@ Filestore.prototype.getBasePublicURL = function(branch, buildId, buildNumber) {
   return path.join(this.bucketName, branch, String(buildId), String(buildNumber));
 };
 
-Filestore.prototype.getFile = function(branch, filename, cb) {
-  branch = this.makeBranchName(branch);
-  var fullFilename = path.join(branch, filename);
-  var file = this.bucket.file(fullFilename);
-  file.download(cb);
+Filestore.prototype.getFile = function(buildId, filePath, cb) {
+  var me = this;
+  this.getBranch(buildId, function(err, branch, safeBranch) {
+    if (err) {
+      cb(err);
+    } else {
+      var fullFilename = path.join(safeBranch, filePath);
+      var file = me.bucket.file(fullFilename);
+      file.download(cb);
+    }
+  });
 };
 
-Filestore.prototype.getLogFile = function(branch, buildId, buildNumber, filename, cb) {
+Filestore.prototype.getLogFile = function(buildId, buildNumber, filename, cb) {
   var logFile = path.join(String(buildId), String(buildNumber), filename);
-  this.getFile(branch, logFile, cb);
+  this.getFile(buildId, logFile, cb);
 };
 
-Filestore.prototype.getMainLogFile = function(branch, buildId, buildNumber, cb) {
-  this.getLogFile(branch, buildId, buildNumber, 'user-script.clean.log', cb);
+Filestore.prototype.getMainLogFile = function(buildId, buildNumber, cb) {
+  this.getLogFile(buildId, buildNumber, 'user-script.clean.log', cb);
 };
 
 Filestore.prototype.getFileList = function(path, cb) {
@@ -96,16 +102,28 @@ Filestore.prototype.getFileList = function(path, cb) {
   });
 }
 
-Filestore.prototype.getBuildFileList = function(branch, buildId, cb) {
-  branch = this.makeBranchName(branch);
-  var dirPath = path.join(branch, String(buildId));
-  this.getFileList(dirPath, cb);
+Filestore.prototype.getBuildFileList = function(buildId, cb) {
+  var me = this;
+  this.getBranch(buildId, function(err, branch, safeBranch) {
+    if (err) {
+      cb(err);
+    } else {
+      var dirPath = path.join(safeBranch, String(buildId));
+      me.getFileList(dirPath, cb);
+    }
+  });
 };
 
-Filestore.prototype.getRunFileList = function(branch, buildId, buildNumber, cb) {
-  branch = this.makeBranchName(branch);
-  var dirPath = path.join(branch, String(buildId), String(buildNumber));
-  this.getFileList(dirPath, cb);
+Filestore.prototype.getRunFileList = function(buildId, buildNumber, cb) {
+  var me = this;
+  this.getBranch(buildId, function(err, branch, safeBranch) {
+    if (err) {
+      cb(err);
+    } else {
+      var dirPath = path.join(safeBranch, String(buildId), String(buildNumber));
+      me.getFileList(dirPath, cb);
+    }
+  });
 };
 
 Filestore.prototype.deleteFile = function(filename, cb) {
@@ -121,9 +139,9 @@ Filestore.prototype.deleteFiles = function(fileList, cb) {
   Util.dealWithAllPromises(promises, cb);
 };
 
-Filestore.prototype.deleteRunFiles = function(branch, buildId, buildNumber, cb) {
+Filestore.prototype.deleteRunFiles = function(buildId, buildNumber, cb) {
   var me = this;
-  this.getRunFileList(branch, buildId, buildNumber, function(err, fileList) {
+  this.getRunFileList(buildId, buildNumber, function(err, fileList) {
     if (err) {
       cb(err);
     } else {
@@ -132,9 +150,9 @@ Filestore.prototype.deleteRunFiles = function(branch, buildId, buildNumber, cb) 
   });
 };
 
-Filestore.prototype.deleteBuildFiles = function(branch, buildId, cb) {
+Filestore.prototype.deleteBuildFiles = function(buildId, cb) {
   var me = this;
-  this.getBuildFileList(branch, buildId, function(err, fileList) {
+  this.getBuildFileList(buildId, function(err, fileList) {
     if (err) {
       cb(err);
     } else {
@@ -144,6 +162,7 @@ Filestore.prototype.deleteBuildFiles = function(branch, buildId, cb) {
 };
 
 Filestore.prototype.getBranch = function(buildId, cb) {
+  var me = this;
   this.getFileList('', function(err, list) {
     if (err) {
       cb(err);
@@ -162,7 +181,7 @@ Filestore.prototype.getBranch = function(buildId, cb) {
       if (!branch) {
         cb('Cannot find branch for buildId ' + buildId);
       } else {
-        cb(null, branch);
+        cb(null, branch, me.makeBranchName(branch));
       }
     }
   });

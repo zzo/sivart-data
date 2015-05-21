@@ -37,7 +37,7 @@ describe("Filestore get and delete", function() {
   });
 
   it('gets build files', function(done) {
-    filestore.getBuildFileList(branch, buildId, function(err, list) {
+    filestore.getBuildFileList(buildId, function(err, list) {
       expect(err).toBeNull();
       expect(list.length).toBe(fileList.length * 2);
       done();
@@ -45,17 +45,26 @@ describe("Filestore get and delete", function() {
   });
 
   it('gets run files', function(done) {
-    filestore.getRunFileList(branch, buildId, buildNumber, function(err, list) {
+    filestore.getRunFileList(buildId, buildNumber, function(err, list) {
       expect(err).toBeNull();
       expect(list.length).toBe(fileList.length);
       done();
     });
   });
 
+  it('gets a log file', function(done) {
+    var filename = fileList[3];  // Pick a random one
+    filestore.getLogFile(buildId, buildNumber, path.basename(filename), function(err, contents) {
+        expect(err).toBeNull();
+        expect(contents.toString('utf8')).toBe(fs.readFileSync(filename, 'utf8'));
+        done();
+    });
+  });
+
   it('deletes files', function(done) {
-    filestore.deleteRunFiles(branch, buildId, buildNumber, function(err) {
+    filestore.deleteRunFiles(buildId, buildNumber, function(err) {
       expect(err).toBeNull();
-      filestore.getBuildFileList(branch, buildId, function(err, list) {
+      filestore.getBuildFileList(buildId, function(err, list) {
         expect(err).toBeNull();
         expect(list.length).toBe(list.length);
         done();
@@ -64,18 +73,17 @@ describe("Filestore get and delete", function() {
   });
 
   it('deletes build files', function(done) {
-    filestore.deleteBuildFiles(branch, buildId, function(err) {
+    filestore.deleteBuildFiles(buildId, function(err) {
       expect(err).toBeNull();
-      filestore.getBuildFileList(branch, buildId, function(err, list) {
-        expect(err).toBeNull();
-        expect(list.length).toBe(0);
+      filestore.getBuildFileList(buildId, function(err, list) {
+        expect(err).not.toBeNull();
         done();
       });
     });
   });
 });
 
-describe("Filestore get branch", function() {
+xdescribe("Filestore get branch", function() {
   var filestore;
 
   beforeEach(function() {
@@ -104,6 +112,14 @@ describe("Filestore get branch", function() {
       done();
     });
   });
+});
 
+xdescribe("Filestore get public URL", function() {
+  var filestore;
+  filestore = new Filestore('angular/angular');
 
+  it('gets public url', function() {
+    var url = filestore.getBasePublicURL('master', 44, 99);
+    expect(url).toBe('sivart-angular-angular/branch-master/44/99');
+  });
 });
