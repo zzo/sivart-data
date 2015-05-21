@@ -193,7 +193,7 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
     if (!me[retryCountProperty]) {
       me[retryCountProperty] = 0;
     }
-    if (me.utries < 10) {
+    if (me[retryCountProperty] < 10) {
       // message: 'too much contention on these datastore entities. please try again.',
       // sleep for a second & try again
       me[retryCountProperty]++;
