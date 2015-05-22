@@ -114,6 +114,29 @@ Filestore.prototype.getFileList = function(filePath, cb) {
   });
 };
 
+Filestore.prototype.getBranches = function(cb) {
+  var branches = {};
+  this.getFileList('', function(err, fileList) {
+    if (err) {
+      cb(err);
+    } else {
+      fileList.forEach(function(fileName) {
+        var regex = new RegExp('^branch-([^/]+)');
+        var matches = regex.exec(fileName);
+        if (matches) {
+          branches[matches[1]] = 1;
+        }
+      });
+      cb(null, Object.keys(branches));
+    }
+  });
+};
+
+Filestore.prototype.getBranchFileList = function(branch, cb) {
+  var safeBranch = this.makeBranchName(branch);
+  this.getFileList(safeBranch, cb);
+};
+
 Filestore.prototype.getBuildFileList = function(buildId, cb) {
   var me = this;
   this.getBranch(buildId, function(err, branch, safeBranch) {
@@ -154,6 +177,32 @@ Filestore.prototype.deleteFiles = function(fileList, cb) {
 Filestore.prototype.deleteRunFiles = function(buildId, buildNumber, cb) {
   var me = this;
   this.getRunFileList(buildId, buildNumber, function(err, fileList) {
+    if (err) {
+      cb(err);
+    } else {
+      me.deleteFiles(fileList, cb);
+    }
+  });
+};
+
+// Not dangerous at all :)
+Filestore.prototype.deleteAllBranches = function(cb) {
+  var me = this;
+  this.getBranches(function(err, branches) {
+    if (err) {
+      cb(err);
+    } else {
+      var promises = branches.map(function(branch) {
+        return Q.ninvoke(me, 'deleteBranchFiles', branch);
+      });
+      Util.dealWithAllPromises(promises, cb);
+    }
+  });
+};
+
+Filestore.prototype.deleteBranchFiles = function(branch, cb) {
+  var me = this;
+  this.getBranchFileList(branch, function(err, fileList) {
     if (err) {
       cb(err);
     } else {

@@ -135,3 +135,43 @@ describe("Filestore get public URL", function() {
     expect(url).toBe('sivart-angular-angular/branch-master/44/99');
   });
 });
+
+describe("Filestore branch list", function() {
+  it('gets branch files', function(done) {
+    var filestore;
+    filestore = new Filestore('zzo/angular');
+    filestore.getBranchFileList('master', function(err, fileList) {
+      expect(err).toBeNull();
+      console.log(fileList);
+      done();
+    });
+  });
+
+  it('gets all branch names', function(done) {
+    var filestore;
+    filestore = new Filestore('zzo/angular');
+    filestore.getBranches(function(err, branches) {
+      expect(err).toBeNull();
+      expect(branches[0]).toBe('master');
+      done();
+    });
+  });
+
+  it('deletes all branch files', function(done) {
+    var filestore;
+    filestore = new Filestore('zzo/angular.js');
+    filestore.deleteBranchFiles('master', function(err) {
+      expect(err).toBeNull();
+      done();
+    });
+  });
+
+  it('deletes all files in all branches', function(done) {
+    var filestore = new Filestore('zzo/angular.js');
+    filestore.deleteAllBranches(function(err) {
+      expect(err).toBeNull();
+      done();
+    });
+  });
+
+});

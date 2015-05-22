@@ -300,11 +300,15 @@ Datastore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
     if (err) {
       cb(err);
     } else {
-      var key = '';
-      run.privateKey.slice(0).forEach(function(ch) {
-        key += String.fromCharCode(ch);
-      });
-      cb(null, key, run);
+      if (!run.privateKey) {
+        cb('No private key');
+      } else {
+        var key = '';
+        run.privateKey.slice(0).forEach(function(ch) {
+          key += String.fromCharCode(ch);
+        });
+        cb(null, key, run);
+      }
     }
   });
 };
