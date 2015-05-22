@@ -236,7 +236,7 @@ Datastore.prototype.determineOverallBuildState = function(build) {
         } else if (run.state === 'building' || run.state === 'running') {
           running = true;
         } else if (run.state === 'canceled') {
-          errored = true;
+          canceled = true;
         }
       }
     });
