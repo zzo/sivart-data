@@ -33,7 +33,6 @@ describe("Filestore get and delete", function() {
         done();
       });
     });
-
   });
 
   it('gets build files', function(done) {
@@ -58,6 +57,19 @@ describe("Filestore get and delete", function() {
         expect(err).toBeNull();
         expect(contents.toString('utf8')).toBe(fs.readFileSync(filename, 'utf8'));
         done();
+    });
+  });
+
+  it('writes a run file', function(done) {
+    var f = '/tmp/foo';
+    fs.writeFileSync(f, 'mark rox');
+    filestore.saveRunFile(buildId, buildNumber, 'markymark', f, function(err) {
+      expect(err).toBeNull();
+      filestore.getLogFile(buildId, buildNumber, 'markymark', function(err, contents) {
+        expect(err).toBeNull();
+        expect(contents.toString()).toBe('mark rox');
+        done();
+      });
     });
   });
 

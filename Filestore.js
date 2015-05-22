@@ -13,6 +13,19 @@ function Filestore(repoName) {
   this.bucket = this.storage.bucket(this.bucketName);
 }
 
+// Takes contents and saves it into a file named 'filename' for the build
+Filestore.prototype.saveRunFile = function(buildId, buildNumber, filename, fileOnDisk, cb) {
+  var me = this;
+  this.getBranch(buildId, function(err, branch, safeBranch) {
+    if (err) {
+      cb(err);
+    } else {
+      var fullPath = path.join(safeBranch, String(buildId), String(buildNumber), filename);
+      me.persistFile(fileOnDisk, fullPath, cb);
+    }
+  });
+};
+
 /*
  * All files in fileList are stored in the 'prefix' directory in the bucket
  */

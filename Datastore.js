@@ -222,6 +222,7 @@ Datastore.prototype.determineOverallBuildState = function(build) {
     var failed = false;
     var errored = false;
     var running = false;
+    var canceled = false;
 
     // individual buildNumber states:
     build.runs.forEach(function(run) {
@@ -234,14 +235,18 @@ Datastore.prototype.determineOverallBuildState = function(build) {
           failed = true;
         } else if (run.state === 'building' || run.state === 'running') {
           running = true;
+        } else if (run.state === 'canceled') {
+          errored = true;
         }
       }
     });
 
     var newState = 'running';
     if (!running) {
-      if (!failed && !errored && !running) {
+      if (!failed && !errored && !running && !canceled) {
         newState = 'passed';
+      } else if (canceled) {
+        newState = 'canceled';
       } else if (failed && errored) {
         // fail wins!  Need to have a single value for the overall build state
         newState = 'failed';
