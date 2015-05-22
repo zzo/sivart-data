@@ -217,7 +217,7 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
  * TODO(trostler): better state management for runs and overall
  */
 Datastore.prototype.determineOverallBuildState = function(build) {
-  if (build.buildData.state === 'running') {
+//  if (build.buildData.state === 'running') {
     // Now figure it out!
     var failed = false;
     var errored = false;
@@ -258,7 +258,7 @@ Datastore.prototype.determineOverallBuildState = function(build) {
     }
 
     return newState;
-  }
+//  }
 };
 
 // Get the startup script for a given buildId/buildNumber
