@@ -294,4 +294,19 @@ Datastore.prototype.getStartupScript = function(buildId, buildNumber, cb) {
   });
 };
 
+// Get the private key for a given buildId/buildNumber
+Datastore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
+  this.getRun(buildId, buildNumber, function(err, run) {
+    if (err) {
+      cb(err);
+    } else {
+      var key = '';
+      run.privateKey.slice(0).forEach(function(ch) {
+        key += String.fromCharCode(ch);
+      });
+      cb(null, key, run);
+    }
+  });
+};
+
 module.exports = Datastore;
