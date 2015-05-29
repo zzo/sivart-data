@@ -13,15 +13,11 @@ function Datastore(repoName) {
 }
 
 // Write out what happened
-Datastore.prototype.saveInitialData = function(runs, rawBuildRequest, buildData, cb) {
-  if (!this.buildId) {
-    cb('Must set Build ID!');
-  } else {
-    var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', String(this.buildId) ]});
-    var dataToStore = Util.cleanDatastoreContents({ buildData: buildData, runs: runs, rawBuildRequest: rawBuildRequest });
-    var entity = { key: key, data: dataToStore };
-    this.dataset.save(entity, cb);
-  }
+Datastore.prototype.saveInitialData = function(buildId, runs, rawBuildRequest, buildData, cb) {
+  var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', String(buildId) ]});
+  var dataToStore = Util.cleanDatastoreContents({ buildData: buildData, runs: runs, rawBuildRequest: rawBuildRequest });
+  var entity = { key: key, data: dataToStore };
+  this.dataset.save(entity, cb);
 };
 
 Datastore.prototype.getNextBuildNumber = function(cb) {
