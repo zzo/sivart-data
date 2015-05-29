@@ -55,5 +55,32 @@ module.exports = {
         cb(null);
       }
     });
+  },
+
+  retryHandler: function(funcToCall, retryCountProperty, args, err, retVal) {
+    var me = this;
+    var cb = args[args.length - 1];
+    if (err) {
+      if (!me[retryCountProperty]) {
+        me[retryCountProperty] = 0;
+      }
+      // good for ~100+ concurrent actions
+      if (me[retryCountProperty] < 20) {
+        // message: 'too much contention on these datastore entities. please try again.',
+        // sleep for a second & try again
+        me[retryCountProperty]++;
+        var sleep = Math.floor(Math.random() * 10) + 1;
+        setTimeout(function() {
+          funcToCall.apply(me, args);
+        }, 1000 * sleep);
+      } else {
+        if (me[retryCountProperty] > 0) {
+          me[retryCountProperty] = 0;
+        }
+        cb(err);
+      }
+    } else {
+      cb(null, retVal);
+    }
   }
 };

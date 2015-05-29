@@ -3,11 +3,13 @@
 var Auth = require('./Auth');
 var Util = require('./Util');
 var gcloud = require('gcloud');
+var Counter = require('./Counter');
 
 function Datastore(repoName) {
   this.name = repoName;
   this.namespace = Util.makeBucketName(repoName);
   this.dataset = gcloud.datastore.dataset(Auth);
+  this.counter = new Counter(this.namespace, this.dataset);
 }
 
 // Write out what happened
@@ -23,42 +25,11 @@ Datastore.prototype.saveInitialData = function(runs, rawBuildRequest, buildData,
 };
 
 Datastore.prototype.getNextBuildNumber = function(cb) {
-  var me = this;
-  var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });
-  this.dataset.runInTransaction(function(transaction, done) {
-    var query = me.dataset.createQuery(me.namespace, key.path);
-    transaction.runQuery(query, function(err, entities) {
-      if (err) {
-        cb(err);
-      } else {
-        var entity;
-        if (entities.length) {
-          entity = entities[0];
-          entity.data.value++;
-        } else {
-          entity = { key: key, data: { value: 1 }};
-        }
-        transaction.save(entity);
-        me.buildId = entity.data.value;
-        done();
-      }
-    });
-  }, function(err) {
-    cb(err, me.buildId);
-  });
+  this.counter.increment(cb);
 };
 
 Datastore.prototype.getCurrentBuildId = function(cb) {
-  var key = this.dataset.key({ namespace: this.namespace, path: [ 'buildId' ] });
-  var query = this.dataset.createQuery(this.namespace, key.path);
-  var me = this;
-  this.dataset.runQuery(query, function(err, entities) {
-    if (entities.length) {
-      cb(null, entities[0].data.value);
-    } else {
-      cb(err || me.namespace + ' does not exist?');
-    }
-  });
+  this.counter.getCount(cb);
 };
 
 /*
@@ -130,6 +101,7 @@ Datastore.prototype.getTotalRunTime = function(build) {
  * called by a script running on the slave instance OR a rerun
  */
 Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb) {
+  var originalArguments = arguments;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
   var me = this;
   this.dataset.runInTransaction(function(transaction, done) {
@@ -163,12 +135,14 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
       }
     });
   }, function(err) {
-    me.retryHandler(me.updateRunState, 'tries', [ buildId, buildNumber, newState, cb ], err);
+    var handler = Util.retryHandler.bind(me);
+    handler(me.incrementPropertyTx, 'tries', originalArguments, err);
   });
 };
 
 // Update overall build state
 Datastore.prototype.updateOverallState = function(buildId, newState, cb) {
+  var originalArguments = arguments;
   var me = this;
   var key = this.dataset.key({ namespace: this.namespace, path: [ 'build', buildId ]});
   this.dataset.runInTransaction(function(transaction, done) {
@@ -182,34 +156,9 @@ Datastore.prototype.updateOverallState = function(buildId, newState, cb) {
       }
     });
   }, function(err) {
-    me.retryHandler(me.updateOverallState, 'utries', [ buildId, newState, cb ], err);
+    var handler = Util.retryHandler.bind(me);
+    handler(me.incrementPropertyTx, 'utries', originalArguments, err);
   });
-};
-
-Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args, err) {
-  var me = this;
-  var cb = args[args.length - 1];
-  if (err) {
-    if (!me[retryCountProperty]) {
-      me[retryCountProperty] = 0;
-    }
-    if (me[retryCountProperty] < 10) {
-      // message: 'too much contention on these datastore entities. please try again.',
-      // sleep for a second & try again
-      me[retryCountProperty]++;
-      var sleep = Math.floor(Math.random() * 10) + 1;
-      setTimeout(function() {
-        funcToCall.apply(me, args);
-      }, 1000 * sleep);
-    } else {
-      if (me[retryCountProperty] > 0) {
-        me[retryCountProperty] = 0;
-      }
-      cb(err);
-    }
-  } else {
-    cb();
-  }
 };
 
 /*
@@ -217,7 +166,6 @@ Datastore.prototype.retryHandler = function(funcToCall, retryCountProperty, args
  * TODO(trostler): better state management for runs and overall
  */
 Datastore.prototype.determineOverallBuildState = function(build) {
-//  if (build.buildData.state === 'running') {
     // Now figure it out!
     var failed = false;
     var errored = false;
@@ -258,7 +206,6 @@ Datastore.prototype.determineOverallBuildState = function(build) {
     }
 
     return newState;
-//  }
 };
 
 // Get the startup script for a given buildId/buildNumber
