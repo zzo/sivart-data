@@ -3,7 +3,7 @@ var Filestore = require('../Filestore');
 var fs = require('fs');
 var path = require('path');
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 40000;
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 400000;
 
 var fileList = fs.readdirSync(__dirname).filter(function(file) {
   var stat = fs.lstatSync(path.join(__dirname, file));
@@ -12,7 +12,7 @@ var fileList = fs.readdirSync(__dirname).filter(function(file) {
   return path.join(__dirname, file);
 });
 
-describe("Filestore get and delete", function() {
+xdescribe("Filestore get and delete", function() {
   var filestore;
   var branch = 'master';
   var buildId = 99;
@@ -95,7 +95,7 @@ describe("Filestore get and delete", function() {
   });
 });
 
-describe("Filestore get branch", function() {
+xdescribe("Filestore get branch", function() {
   var filestore;
 
   beforeEach(function() {
@@ -126,7 +126,7 @@ describe("Filestore get branch", function() {
   });
 });
 
-describe("Filestore get public URL", function() {
+xdescribe("Filestore get public URL", function() {
   var filestore;
   filestore = new Filestore('angular/angular');
 
@@ -137,7 +137,7 @@ describe("Filestore get public URL", function() {
 });
 
 describe("Filestore branch list", function() {
-  it('gets branch files', function(done) {
+  xit('gets branch files', function(done) {
     var filestore;
     filestore = new Filestore('zzo/angular');
     filestore.getBranchFileList('master', function(err, fileList) {
@@ -147,7 +147,7 @@ describe("Filestore branch list", function() {
     });
   });
 
-  it('gets all branch names', function(done) {
+  xit('gets all branch names', function(done) {
     var filestore;
     filestore = new Filestore('zzo/angular');
     filestore.getBranches(function(err, branches) {
@@ -157,7 +157,7 @@ describe("Filestore branch list", function() {
     });
   });
 
-  it('deletes all branch files', function(done) {
+  xit('deletes all branch files', function(done) {
     var filestore;
     filestore = new Filestore('zzo/angular.js');
     filestore.deleteBranchFiles('master', function(err) {
@@ -167,7 +167,7 @@ describe("Filestore branch list", function() {
   });
 
   it('deletes all files in all branches', function(done) {
-    var filestore = new Filestore('zzo/angular.js');
+    var filestore = new Filestore('angular/angular');
     filestore.deleteAllBranches(function(err) {
       expect(err).toBeNull();
       done();

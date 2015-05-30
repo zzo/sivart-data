@@ -95,22 +95,36 @@ Filestore.prototype.getMainLogFile = function(buildId, buildNumber, cb) {
   this.getLogFile(buildId, buildNumber, 'user-script.clean.log', cb);
 };
 
-Filestore.prototype.getFileList = function(filePath, cb) {
-  this.bucket.getFiles({
-    prefix: filePath,
-    delimeter: '/'
-  }, function(err, files, nextQuery, apiResponse) {
-    if (err) {
-      cb(err);
-    } else {
-      var retFiles = [];
-      if (apiResponse.items) {
-        retFiles = apiResponse.items.map(function(item) {
-          return item.name;
-        });
-      }
-      cb(null, retFiles);
+Filestore.prototype.dealfest = function(err, cb, allItems, apiResponse, nextQuery, func) {
+  if (err) {
+    cb(err);
+  } else {
+    if (apiResponse.items) {
+      allItems = allItems.concat(apiResponse.items.map(function(item) {
+        return item.name;
+      }));
     }
+    if (!nextQuery) {
+      cb(null, allItems);
+    } else {
+      func.call(this, null, cb, allItems, nextQuery);
+    }
+  }
+};
+
+Filestore.prototype.getFileList = function(filePath, cb, filesSoFar, nextQuery) {
+  var query;
+  if (!filesSoFar) {
+    filesSoFar = [];
+    query = {
+      prefix: filePath,
+      delimeter: '/'
+    };
+  }
+
+  var me = this;
+  this.bucket.getFiles(nextQuery || query, function(err, files, nextQ, apiResponse) {
+    me.dealfest(err, cb, filesSoFar, apiResponse, nextQ, me.getFileList);
   });
 };
 
