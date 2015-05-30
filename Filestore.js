@@ -5,6 +5,7 @@ var Util = require('./Util');
 var gcloud = require('gcloud');
 var Q = require('q');
 var path = require('path');
+var fs = require('fs');
 
 function Filestore(repoName) {
   this.name = repoName;
@@ -12,6 +13,37 @@ function Filestore(repoName) {
   this.storage = gcloud.storage(Auth);
   this.bucket = this.storage.bucket(this.bucketName);
 }
+
+Filestore.prototype.save = function() {
+  var args = Array.prototype.slice.call(arguments);
+  var cb = args.pop();
+  var fileOnDisk = args[args.length -1];
+  args[0] = this.makeBranchName(args[0]);
+  args[args.length - 1] = path.basename(args[args.length - 1]);
+  var fullPath = args.join('/');
+  this.persistFile(fileOnDisk, fullPath, cb);
+};
+
+Filestore.prototype.get = function(path, cb) {
+  var file = this.bucket.file(path);
+  file.download(cb);
+};
+
+Filestore.prototype.saveBuildNumberFile = function(branch, buildId, buildNumber, fileOnDisk, cb) {
+  this.save.apply(this, arguments);
+};
+
+Filestore.prototype.saveBuildFile = function(branch, buildId, fileOnDisk, cb) {
+  this.save.apply(this, arguments);
+};
+
+Filestore.prototype.saveBranchFile = function(branch, fileOnDisk, cb) {
+  this.save.apply(this, arguments);
+};
+
+Filestore.prototype.saveRepoFile = function(fileOnDisk, cb) {
+  this.persistFile(fileOnDisk, path.basename(fileOnDisk),  cb);
+};
 
 // Takes contents and saves it into a file named 'filename' for the build
 Filestore.prototype.saveRunFile = function(buildId, buildNumber, filename, fileOnDisk, cb) {
@@ -79,7 +111,7 @@ Filestore.prototype.getFile = function(buildId, filePath, cb) {
     if (err) {
       cb(err);
     } else {
-      var fullFilename = path.join(safeBranch, filePath);
+      var fullFilename = path.join(safeBranch, String(buildId), filePath);
       var file = me.bucket.file(fullFilename);
       file.download(cb);
     }
@@ -260,6 +292,32 @@ Filestore.prototype.getBranch = function(buildId, cb) {
       }
     }
   });
+};
+
+Filestore.prototype.savePrivateKey = function(branch, buildId, buildNumber, keyData, cb) {
+  var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'private.key');
+  if (!fs.existsSync(path.dirname(tmpFile))) {
+    fs.mkdirSync(path.dirname(tmpFile));
+  }
+  fs.writeFileSync(tmpFile, keyData, 'utf8');
+  this.saveBuildNumberFile(branch, buildId, buildNumber, tmpFile, cb);
+};
+
+Filestore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
+  this.getFile(buildId, path.join(String(buildNumber), 'private.key'), cb);
+};
+
+Filestore.prototype.saveStartupScript = function(branch, buildId, buildNumber, script, cb) {
+  var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'startupScript.sh');
+  if (!fs.existsSync(path.dirname(tmpFile))) {
+    fs.mkdirSync(path.dirname(tmpFile));
+  }
+  fs.writeFileSync(tmpFile, script, 'utf8');
+  this.saveBuildNumberFile(branch, buildId, buildNumber, tmpFile, cb);
+};
+
+Filestore.prototype.getStartupScript = function(branch, buildId, buildNumber, cb) {
+  this.getFile(buildId, path.join(String(buildNumber), 'startupScript.sh'), cb);
 };
 
 module.exports = Filestore;
