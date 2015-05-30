@@ -320,4 +320,14 @@ Filestore.prototype.getStartupScript = function(branch, buildId, buildNumber, cb
   this.getFile(buildId, path.join(String(buildNumber), 'startupScript.sh'), cb);
 };
 
+Filestore.prototype.saveScriptAndPK = function(branch, buildId, buildNumber, script, pk, cb) {
+  var me = this;
+  Q.ninvoke(this, 'saveStartupScript', branch, buildId, buildNumber, script)
+  .then(function() {
+    return Q.ninvoke(me, 'savePrivateKey', branch, buildId, buildNumber, pk);
+  })
+  .then(function() { cb(null); })
+  .catch(cb);
+};
+
 module.exports = Filestore;

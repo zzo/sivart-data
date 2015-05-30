@@ -108,5 +108,20 @@ describe("Filestore get and delete", function() {
    });
  });
 
+  it('saves a startup script and PK in one shot', function(done) {
+    filestore.deleteRunFiles(buildId, buildNumber, function() {
+     filestore.saveScriptAndPK(branch, buildId, buildNumber, 'startup script', 'private key', function(err, rez) {
+       expect(err).toBeNull();
+       filestore.getStartupScript(branch, buildId, buildNumber, function(err, script) {
+         expect(err).toBeNull();
+         expect(script.toString()).toBe('startup script');
+         filestore.getPrivateKey(buildId, buildNumber, function(err, pk) {
+           expect(err).toBeNull();
+           expect(pk.toString()).toBe('private key');
+           done();
+         });
+       });
+     });
+   });
+  });
 });
-
