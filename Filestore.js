@@ -294,40 +294,40 @@ Filestore.prototype.getBranch = function(buildId, cb) {
   });
 };
 
+// Returns PROMISE
 Filestore.prototype.savePrivateKey = function(branch, buildId, buildNumber, keyData, cb) {
   var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'private.key');
   if (!fs.existsSync(path.dirname(tmpFile))) {
     fs.mkdirSync(path.dirname(tmpFile));
   }
   fs.writeFileSync(tmpFile, keyData, 'utf8');
-  this.saveBuildNumberFile(branch, buildId, buildNumber, tmpFile, cb);
+  return Q.ninvoke(this, 'saveBuildNumberFile', branch, buildId, buildNumber, tmpFile);
 };
 
 Filestore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
   this.getFile(buildId, path.join(String(buildNumber), 'private.key'), cb);
 };
 
+// Returns PROMISE
 Filestore.prototype.saveStartupScript = function(branch, buildId, buildNumber, script, cb) {
   var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'startupScript.sh');
   if (!fs.existsSync(path.dirname(tmpFile))) {
     fs.mkdirSync(path.dirname(tmpFile));
   }
   fs.writeFileSync(tmpFile, script, 'utf8');
-  this.saveBuildNumberFile(branch, buildId, buildNumber, tmpFile, cb);
+  return Q.ninvoke(this, 'saveBuildNumberFile', branch, buildId, buildNumber, tmpFile);
 };
 
 Filestore.prototype.getStartupScript = function(branch, buildId, buildNumber, cb) {
   this.getFile(buildId, path.join(String(buildNumber), 'startupScript.sh'), cb);
 };
 
-Filestore.prototype.saveScriptAndPK = function(branch, buildId, buildNumber, script, pk, cb) {
+Filestore.prototype.saveScriptAndPK = function(branch, buildId, buildNumber, script, pk) {
   var me = this;
-  Q.ninvoke(this, 'saveStartupScript', branch, buildId, buildNumber, script)
+  return this.saveStartupScript(branch, buildId, buildNumber, script)
   .then(function() {
-    return Q.ninvoke(me, 'savePrivateKey', branch, buildId, buildNumber, pk);
-  })
-  .then(function() { cb(null); })
-  .catch(cb);
+    return me.savePrivateKey(branch, buildId, buildNumber, pk);
+  });
 };
 
 module.exports = Filestore;
