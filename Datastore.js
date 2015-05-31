@@ -132,7 +132,7 @@ Datastore.prototype.updateRunState = function(buildId, buildNumber, newState, cb
     });
   }, function(err) {
     var handler = Util.retryHandler.bind(me);
-    handler(me.incrementPropertyTx, 'tries', originalArguments, err);
+    handler(me.updateRunState, 'tries', originalArguments, err);
   });
 };
 
@@ -153,7 +153,7 @@ Datastore.prototype.updateOverallState = function(buildId, newState, cb) {
     });
   }, function(err) {
     var handler = Util.retryHandler.bind(me);
-    handler(me.incrementPropertyTx, 'utries', originalArguments, err);
+    handler(me.updateOverallState, 'utries', originalArguments, err);
   });
 };
 
