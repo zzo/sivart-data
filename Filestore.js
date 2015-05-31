@@ -119,7 +119,7 @@ Filestore.prototype.getFile = function(buildId, filePath, cb) {
 };
 
 Filestore.prototype.getLogFile = function(buildId, buildNumber, filename, cb) {
-  var logFile = path.join(String(buildId), String(buildNumber), filename);
+  var logFile = path.join(String(buildNumber), filename);
   this.getFile(buildId, logFile, cb);
 };
 
