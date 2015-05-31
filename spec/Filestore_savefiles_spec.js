@@ -99,7 +99,7 @@ describe("Filestore get and delete", function() {
    filestore.deleteRunFiles(buildId, buildNumber, function() {
      filestore.saveStartupScript(branch, buildId, buildNumber, 'startup script', function(err, rez) {
        expect(err).toBeNull();
-       filestore.getStartupScript(branch, buildId, buildNumber, function(err, script) {
+       filestore.getStartupScript(buildId, buildNumber, function(err, script) {
          expect(err).toBeNull();
          expect(script.toString()).toBe('startup script');
          done();
@@ -112,7 +112,7 @@ describe("Filestore get and delete", function() {
     filestore.deleteRunFiles(buildId, buildNumber, function() {
      filestore.saveScriptAndPK(branch, buildId, buildNumber, 'startup script', 'private key', function(err, rez) {
        expect(err).toBeNull();
-       filestore.getStartupScript(branch, buildId, buildNumber, function(err, script) {
+       filestore.getStartupScript(buildId, buildNumber, function(err, script) {
          expect(err).toBeNull();
          expect(script.toString()).toBe('startup script');
          filestore.getPrivateKey(buildId, buildNumber, function(err, pk) {

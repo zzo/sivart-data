@@ -223,37 +223,4 @@ Datastore.prototype.getRun = function(buildId, buildNumber, cb) {
 };
 
 // Get the startup script for a given buildId/buildNumber
-Datastore.prototype.getStartupScript = function(buildId, buildNumber, cb) {
-  this.getRun(buildId, buildNumber, function(err, run) {
-    if (err) {
-      cb(err);
-    } else {
-      var script = '';
-      run.script.slice(0).forEach(function(ch) {
-        script += String.fromCharCode(ch);
-      });
-      cb(null, script);
-    }
-  });
-};
-
-// Get the private key for a given buildId/buildNumber
-Datastore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
-  this.getRun(buildId, buildNumber, function(err, run) {
-    if (err) {
-      cb(err);
-    } else {
-      if (!run.privateKey) {
-        cb('No private key');
-      } else {
-        var key = '';
-        run.privateKey.slice(0).forEach(function(ch) {
-          key += String.fromCharCode(ch);
-        });
-        cb(null, key, run);
-      }
-    }
-  });
-};
-
 module.exports = Datastore;

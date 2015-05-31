@@ -318,7 +318,7 @@ Filestore.prototype.saveStartupScript = function(branch, buildId, buildNumber, s
   return Q.ninvoke(this, 'saveBuildNumberFile', branch, buildId, buildNumber, tmpFile);
 };
 
-Filestore.prototype.getStartupScript = function(branch, buildId, buildNumber, cb) {
+Filestore.prototype.getStartupScript = function(buildId, buildNumber, cb) {
   this.getFile(buildId, path.join(String(buildNumber), 'startupScript.sh'), cb);
 };
 
