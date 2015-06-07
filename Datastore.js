@@ -37,7 +37,13 @@ Datastore.prototype.getCurrentBuild = function(cb) {
     if (err) {
       cb(err);
     } else {
-      me.getABuild(id, cb);
+      me.getABuild(id, function(err, build) {
+        if (err) {
+          me.getABuild(id-1, cb);
+        } else {
+          cb(null, build);
+        }
+      });
     }
   });
 };
