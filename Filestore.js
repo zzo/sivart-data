@@ -17,15 +17,15 @@ function Filestore(repoName) {
 Filestore.prototype.save = function() {
   var args = Array.prototype.slice.call(arguments);
   var cb = args.pop();
-  var fileOnDisk = args[args.length -1];
+  var fileOnDisk = args[args.length - 1];
   args[0] = this.makeBranchName(args[0]);
   args[args.length - 1] = path.basename(args[args.length - 1]);
   var fullPath = args.join('/');
   this.persistFile(fileOnDisk, fullPath, cb);
 };
 
-Filestore.prototype.get = function(path, cb) {
-  var file = this.bucket.file(path);
+Filestore.prototype.get = function(fpath, cb) {
+  var file = this.bucket.file(fpath);
   file.download(cb);
 };
 
@@ -42,7 +42,7 @@ Filestore.prototype.saveBranchFile = function(branch, fileOnDisk, cb) {
 };
 
 Filestore.prototype.saveRepoFile = function(fileOnDisk, cb) {
-  this.persistFile(fileOnDisk, path.basename(fileOnDisk),  cb);
+  this.persistFile(fileOnDisk, path.basename(fileOnDisk), cb);
 };
 
 // Takes contents and saves it into a file named 'filename' for the build
@@ -295,7 +295,7 @@ Filestore.prototype.getBranch = function(buildId, cb) {
 };
 
 // Returns PROMISE
-Filestore.prototype.savePrivateKey = function(branch, buildId, buildNumber, keyData, cb) {
+Filestore.prototype.savePrivateKey = function(branch, buildId, buildNumber, keyData) {
   var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'private.key');
   if (!fs.existsSync(path.dirname(tmpFile))) {
     fs.mkdirSync(path.dirname(tmpFile));
@@ -309,7 +309,21 @@ Filestore.prototype.getPrivateKey = function(buildId, buildNumber, cb) {
 };
 
 // Returns PROMISE
-Filestore.prototype.saveStartupScript = function(branch, buildId, buildNumber, script, cb) {
+Filestore.prototype.saveYML = function(branch, buildId, buildNumber, script) {
+  var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'script.yml');
+  if (!fs.existsSync(path.dirname(tmpFile))) {
+    fs.mkdirSync(path.dirname(tmpFile));
+  }
+  fs.writeFileSync(tmpFile, script, 'utf8');
+  return Q.ninvoke(this, 'saveBuildNumberFile', branch, buildId, buildNumber, tmpFile);
+};
+
+Filestore.prototype.getYML = function(buildId, buildNumber, cb) {
+  this.getFile(buildId, path.join(String(buildNumber), 'script.yml'), cb);
+};
+
+// Returns PROMISE
+Filestore.prototype.saveStartupScript = function(branch, buildId, buildNumber, script) {
   var tmpFile = path.join('/tmp', branch + buildId + buildNumber, 'startupScript.sh');
   if (!fs.existsSync(path.dirname(tmpFile))) {
     fs.mkdirSync(path.dirname(tmpFile));
@@ -322,11 +336,16 @@ Filestore.prototype.getStartupScript = function(buildId, buildNumber, cb) {
   this.getFile(buildId, path.join(String(buildNumber), 'startupScript.sh'), cb);
 };
 
-Filestore.prototype.saveScriptAndPK = function(branch, buildId, buildNumber, script, pk) {
+Filestore.prototype.saveScriptAndPKAndYML = function(branch, buildId, buildNumber, script, pk, yml) {
   var me = this;
   return this.saveStartupScript(branch, buildId, buildNumber, script)
   .then(function() {
     return me.savePrivateKey(branch, buildId, buildNumber, pk);
+  })
+  .then(function() {
+    if (yml) {
+      return me.saveYML(branch, buildId, buildNumber, yml);
+    }
   });
 };
 
